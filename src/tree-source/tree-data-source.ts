@@ -7,15 +7,12 @@ import {
   TreeItemSearchRowData, TreeRowConfig, TreeSearchColumnConfig, TreeSearchConfig, TreeSearchData, TreeSearchRowData, TreeSortConfig
 } from "./tree-data";
 import {TreeFolderFilterState, TreeItemFilterState} from "../filter.service";
-import {applySelector} from "../lib/functions";
-import {Selection, SimpleObject, Sort, SortFn, WithId} from "../lib/types";
 import {BulkRelocateModel, MoveModel} from "../models/move";
 import {cache} from "../lib/rxjs";
 import {TreeDataOptionConfig} from "./tree-source-config";
-import {mapToArr} from "../lib/arrays";
-import {toTitleCase} from "../lib/strings";
-import {arrToLookup, arrToMap} from "../lib/maps";
 import {DetachedSearchData} from "../models/detached-search";
+import {applySelector, arrToLookup, arrToMap, mapToArr, Selection, SimpleObject, SortFn, titleCase, WithId} from "@consensus-labs/ts-tools";
+import {Sort} from "../lib/types";
 
 export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
 
@@ -87,7 +84,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
 
     this.hasActions = !!options.folderActions.length || !!options.itemActions.length;
 
-    this.columns = mapToArr(this.searchColumns, (_, x) => x);
+    this.columns = mapToArr(this.searchColumns);
 
     for (let [id, col] of hiddenSortColumns) {
       this.sortOptions.push({id, name: col.title});
@@ -101,7 +98,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
 
     for (let [id, col] of searchColumns) {
       if (col.sorting) {
-        this.sortOptions.push({id: col.id, name: col.title ?? toTitleCase(col.id)});
+        this.sortOptions.push({id: col.id, name: col.title ?? titleCase(col.id)});
         this.sortLookup.set(col.id, col.sorting);
       }
 
@@ -651,7 +648,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
 
   private mapSidebarRoot(lookup: Map<string, TreeFolder<TFolder, TItem>>): TreeAsideData<TFolder, TItem> {
 
-    const folders = mapToArr(lookup, (_, x) => x)
+    const folders = mapToArr(lookup)
       .filter(folder => folder.parentId == undefined)
       .map(folder => this.mapSidebarFolder(folder));
 
@@ -866,7 +863,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
     this.folderSearcher = new Fuse<TreeFolderSearchData<TFolder, TItem>>(folders, {
       includeScore: true,
       shouldSort: true,
-      keys: mapToArr(this.searchConfigs, (key, val) => ({key, val}))
+      keys: mapToArr(this.searchConfigs, (val, key) => ({key, val}))
         .filter(({val}) => !!val.mapFolder)
         .map(({key}) => ['search', key])
     });
@@ -887,7 +884,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
     this.itemSearcher = new Fuse<TreeItemSearchData<TFolder, TItem>>(items, {
       includeScore: true,
       shouldSort: true,
-      keys: mapToArr(this.searchConfigs, (key, val) => ({key, val}))
+      keys: mapToArr(this.searchConfigs, (val, key) => ({key, val}))
         .filter(({val}) => !!val.mapItem)
         .map(({key}) => ['search', key])
     });

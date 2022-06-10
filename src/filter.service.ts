@@ -1,7 +1,7 @@
 import {asyncScheduler, BehaviorSubject} from "rxjs";
 import {distinctUntilChanged, throttleTime} from "rxjs/operators";
 import {BaseTreeFolder, BaseTreeItem} from "./tree-source/tree-data";
-import {deepCopy} from "./lib/objects";
+import {deepCopy} from "@consensus-labs/ts-tools";
 
 class DataFilter<TFilter, TModel> {
     constructor(

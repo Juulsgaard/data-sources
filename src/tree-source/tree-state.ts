@@ -2,11 +2,10 @@ import {
   auditTime, BehaviorSubject, combineLatest, delay, EMPTY, firstValueFrom, merge, Observable, Observer, of, shareReplay, Subscribable, Unsubscribable
 } from "rxjs";
 import {distinctUntilChanged, filter, map, skip, switchMap} from "rxjs/operators";
-import {WithId} from "../lib/types";
 import {cache} from "../lib/rxjs";
 import {BaseTreeFolder, BaseTreeItem, TreeAsideData, TreeFolder, TreeItem} from "./tree-data";
 import {TreeDataSource} from "./tree-data-source";
-import {isString} from "../lib/type-predicates";
+import {isString, WithId} from "@consensus-labs/ts-tools";
 
 class BaseTreeState<TFolder extends WithId, TItem extends WithId> {
 

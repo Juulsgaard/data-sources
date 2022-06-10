@@ -1,9 +1,11 @@
-//<editor-fold desc="Tree Data Structure">
-import {Selection, SimpleObject, SortFn, ThemeColor} from "../lib/types";
+
 import {TreeFolderFilterService, TreeItemFilterService} from "../filter.service";
 import {RenderDataType} from "../models/render-types";
 import {BulkRelocateModel, MoveModel} from "../models/move";
+import {Selection, SimpleObject, SortFn} from "@consensus-labs/ts-tools";
+import {ThemeColor} from "../lib/types";
 
+//<editor-fold desc="Tree Data Structure">
 /**
  * Display data for Folders in Tree View
  */

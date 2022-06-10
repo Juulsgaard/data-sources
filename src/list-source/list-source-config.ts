@@ -1,13 +1,10 @@
 import {RenderDataPrimaryTypes, RenderDataType, RenderDataTypeLookup, RenderDataTypes} from "../models/render-types";
-import {getSelectorFn} from "../lib/functions";
 import {FilterService} from "../filter.service";
 import {GridDataConfig, ListActionOptions, ListDataConfig, ListDataSourceOptions} from "./list-data";
 import {HiddenSearchColumn, HiddenSortColumn, TableColumn, TableColumnOptions} from "./table-data";
 import {ListDataSource} from "./list-data-source";
-import {KeysOfType, SortFn, WithId} from "../lib/types";
 import {getRenderDataTypeSorting} from "../lib/sorting";
-import {arrToObj} from "../lib/objects";
-import {lowerFirst} from "../lib/strings";
+import {arrToObj, getSelectorFn, KeysOfType, lowerFirst, SortFn, WithId} from "@consensus-labs/ts-tools";
 
 
 type TableColumnConfigs<TModel extends WithId> = {

@@ -1,6 +1,6 @@
 import {ListActionConfig} from "./list-data";
-import {SimpleObject, SortFn} from "../lib/types";
 import {RenderDataType} from "../models/render-types";
+import {SimpleObject, SortFn} from "@consensus-labs/ts-tools";
 
 //<editor-fold desc="Column Data">
 

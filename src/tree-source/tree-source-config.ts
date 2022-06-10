@@ -3,14 +3,11 @@ import {
   TreeItemActionOptions, TreeItemMap, TreeMoveActions, TreeRowConfig, TreeSearchColumnConfig, TreeSortConfig
 } from "./tree-data";
 import {RenderDataPrimaryTypes, RenderDataType, RenderDataTypeLookup, RenderDataTypes} from "../models/render-types";
-import {Conditional, KeysOfType, Selection, WithId} from "../lib/types";
 import {getRenderDataTypeSorting} from "../lib/sorting";
 import {TreeDataSource} from "./tree-data-source";
-import {getSelectorFn} from "../lib/functions";
 import {TreeFolderFilterService, TreeItemFilterService} from "../filter.service";
 import {ISorted, sortByIndexAsc} from "../lib/index-sort";
-import {arrToObj} from "../lib/objects";
-import {lowerFirst} from "../lib/strings";
+import {arrToObj, Conditional, getSelectorFn, KeysOfType, lowerFirst, Selection, WithId} from "@consensus-labs/ts-tools";
 
 //<editor-fold desc="Option Builder">
 export class TreeDataOptionConfig<TFolder extends WithId, TItem extends WithId> {

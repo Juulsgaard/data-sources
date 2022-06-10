@@ -2,17 +2,15 @@ import {asyncScheduler, BehaviorSubject, combineLatest, merge, Observable, of, R
 import {catchError, map, switchMap, tap, throttleTime} from "rxjs/operators";
 import Fuse from "fuse.js";
 import {FilterServiceState} from "../filter.service";
-import {Page, SimpleObject, Sort, SortFn, WithId} from "../lib/types";
 import {GridData, GridDataConfig, ListData, ListDataConfig, ListDataSourceOptions, ListSearchData, ListUniversalData} from "./list-data";
-import {applyQueryParam} from "../lib/urls";
 import {ListDataSourceConfig} from "./list-source-config";
 import {HiddenSearchColumn, HiddenSortColumn, TableColumn, TableData} from "./table-data";
 import {cache} from "../lib/rxjs";
 import {ISorted, sortByIndexAsc} from "../lib/index-sort";
-import {mapArr, mapToArr} from "../lib/arrays";
-import {arrToMap} from "../lib/maps";
 import {DetachedSearchData} from "../models/detached-search";
 import FuseResult = Fuse.FuseResult;
+import {applyQueryParam, arrToMap, mapArr, mapToArr, SimpleObject, SortFn, WithId} from "@consensus-labs/ts-tools";
+import {Page, Sort} from "../lib/types";
 
 export class ListDataSource<TModel extends WithId> {
 
@@ -60,7 +58,7 @@ export class ListDataSource<TModel extends WithId> {
     private readonly gridConfig?: GridDataConfig<TModel>,
   ) {
 
-    this.columns = mapToArr(tableColumns, (_, x) => x);
+    this.columns = mapToArr(tableColumns);
 
     this.paginated = options.paginated;
     this.indexSorted = options.indexSorted;

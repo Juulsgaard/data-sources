@@ -1,8 +1,7 @@
 import {BehaviorSubject, combineLatest, EMPTY, firstValueFrom, merge, Observable, Observer, Subscribable, Unsubscribable} from "rxjs";
 import {distinctUntilChanged, map} from "rxjs/operators";
 import {cache} from "../lib/rxjs";
-import {WithId} from "../lib/types";
-import {isString} from "../lib/type-predicates";
+import {isString, WithId} from "@consensus-labs/ts-tools";
 
 export class ListSelection<TModel> implements Subscribable<TModel|undefined> {
 
