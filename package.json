@@ -1,6 +1,6 @@
 {
   "name": "@consensus-labs/data-sources",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A system for managing lists and trees of data",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -9,7 +9,11 @@
   "files": [
     "dist/**"
   ],
+  "publishConfig": {
+    "registry": "https://gitlab.com/api/v4/projects/36921000/packages/npm/"
+  },
   "devDependencies": {
+    "@consensus-labs/ts-tools": "^1.0.0",
     "@types/jest": "^28.1.1",
     "fuse.js": "^6.6.0",
     "jest": "^28.1.1",
@@ -25,6 +29,7 @@
     "prepublishOnly": "tsc && rollup -c"
   },
   "peerDependencies": {
+    "@consensus-labs/ts-tools": "^1.0.0",
     "fuse.js": "^6.6.0",
     "rxjs": "^7.4.0"
   },
