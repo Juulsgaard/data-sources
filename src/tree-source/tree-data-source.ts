@@ -924,18 +924,18 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
    * @param query$ - The dedicated query
    * @param limit - Limit the amount of search results
    */
-  getDetachedFolderSearch(query$: Observable<string>, limit = 20): Observable<DetachedSearchData<TFolder>[]> {
+  getDetachedFolderSearch(query$: Observable<string>, limit = 20): Observable<DetachedSearchData<TreeFolder<TFolder, TItem>>[]> {
 
     return combineLatest([this.folderSearchData$, query$]).pipe(
       map(([, query]) => this.searchFolders(query ?? '', 20)),
       map(list => list.map(({score, item}) => ({
         id: item.model.model.id,
-        model: item.model.model,
+        model: item.model,
         name: this.treeConfig?.folderName(item.model.model, item.model),
         icon: this.getFolderIcon(item.model),
         extra: this.treeConfig?.folderBonus?.(item.model.model, item.model),
         score: score
-      } as DetachedSearchData<TFolder>))),
+      } as DetachedSearchData<TreeFolder<TFolder, TItem>>))),
       cache()
     );
   }
@@ -945,18 +945,18 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
    * @param query$ - The dedicated query
    * @param limit - Limit the amount of search results
    */
-  getDetachedItemSearch(query$: Observable<string>, limit = 20): Observable<DetachedSearchData<TItem>[]> {
+  getDetachedItemSearch(query$: Observable<string>, limit = 20): Observable<DetachedSearchData<TreeItem<TFolder, TItem>>[]> {
 
     return combineLatest([this.itemSearchData$, query$]).pipe(
       map(([, query]) => this.searchItems(query ?? '', 20)),
       map(list => list.map(({score, item}) => ({
         id: item.model.model.id,
-        model: item.model.model,
+        model: item.model,
         name: this.treeConfig?.itemName(item.model.model, item.model),
         icon: this.getItemIcon(item.model),
         extra: this.treeConfig?.itemBonus?.(item.model.model, item.model),
         score: score
-      } as DetachedSearchData<TItem>))),
+      } as DetachedSearchData<TreeItem<TFolder, TItem>>))),
       cache()
     );
   }

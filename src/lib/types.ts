@@ -18,7 +18,7 @@ export interface Sort {
   /** The id of the column being sorted. */
   active: string;
   /** The sort direction. */
-  direction: 'asc'|'desc';
+  direction: 'asc'|'desc'|'';
 }
 
 export interface Page {
