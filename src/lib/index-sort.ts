@@ -4,5 +4,5 @@ export interface ISorted {
 }
 
 export function sortByIndexAsc(a: ISorted, b: ISorted) {
-  return (a?.index ?? 0) - (a?.index ?? 0);
+  return (a?.index ?? 0) - (b?.index ?? 0);
 }
