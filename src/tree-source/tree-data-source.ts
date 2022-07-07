@@ -573,7 +573,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
       folder.folders = subFolders;
     }
 
-    const root = folderLookup.get(null) ?? [];
+    const root = folderLookup.get(undefined) ?? [];
 
     for (let folder of root) {
       this.populateDeepFolder(folder, []);
