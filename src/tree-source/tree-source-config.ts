@@ -146,8 +146,8 @@ class TreeDataSourceConfig<TFolder extends WithId, TItem extends WithId> {
   };
 
   search: {
-    folder(id: string, map: TreeFolderMap<TFolder, TItem, string>, weight?: number): TreeDataSourceConfig<TFolder, TItem>;
-    item(id: string, map: TreeItemMap<TFolder, TItem, string>, weight?: number): TreeDataSourceConfig<TFolder, TItem>;
+    folder(id: string, map: TreeFolderMap<TFolder, TItem, string|undefined>, weight?: number): TreeDataSourceConfig<TFolder, TItem>;
+    item(id: string, map: TreeItemMap<TFolder, TItem, string|undefined>, weight?: number): TreeDataSourceConfig<TFolder, TItem>;
   }
 
   constructor(
@@ -177,11 +177,11 @@ class TreeDataSourceConfig<TFolder extends WithId, TItem extends WithId> {
     };
 
     this.search = {
-      folder: (id: string, map: TreeFolderMap<TFolder, TItem, string>, weight?: number) => {
+      folder: (id: string, map: TreeFolderMap<TFolder, TItem, string|undefined>, weight?: number) => {
         this.hiddenSearchColumns.push({mapFolder: map, id, weight});
         return this;
       },
-      item: (id: string, map: TreeItemMap<TFolder, TItem, string>, weight?: number) => {
+      item: (id: string, map: TreeItemMap<TFolder, TItem, string|undefined>, weight?: number) => {
         this.hiddenSearchColumns.push({mapItem: map, id, weight});
         return this;
       }
