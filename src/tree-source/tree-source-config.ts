@@ -310,10 +310,11 @@ class SearchColumnFinalConfig<TFolder extends WithId, TFolderData extends Render
     return this;
   }
 
-  includeInSearch() {
+  includeInSearch(weight?: number) {
     this.config.searching = {
       mapFolder: (folder, meta) => this.config.folder.mapData(folder, meta)?.toString(),
-      mapItem: (item, meta) => this.config.item.mapData(item, meta)?.toString()
+      mapItem: (item, meta) => this.config.item.mapData(item, meta)?.toString(),
+      weight
     };
     return this;
   }
