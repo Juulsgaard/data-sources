@@ -88,9 +88,9 @@ export class TreeDataOptionConfig<TFolder extends WithId, TItem extends WithId> 
     return {
       folderRow: (
         getName: TreeFolderMap<TFolder, TItem, string>,
-        getIcon?: TreeFolderMap<TFolder, TItem, string>|null,
-        getBonus?: TreeFolderMap<TFolder, TItem, string>|null,
-        getTooltip?: TreeFolderMap<TFolder, TItem, string>|null,
+        getIcon?: TreeFolderMap<TFolder, TItem, string|undefined>|null,
+        getBonus?: TreeFolderMap<TFolder, TItem, string|undefined>|null,
+        getTooltip?: TreeFolderMap<TFolder, TItem, string|undefined>|null,
       ) => {
         const folderConfig: Pick<TreeRowConfig<TFolder, TItem>, 'folderName' | 'folderIcon' | 'folderBonus' | 'folderTooltip'> = {
           folderName: getName,
@@ -101,9 +101,9 @@ export class TreeDataOptionConfig<TFolder extends WithId, TItem extends WithId> 
         return {
           itemRow: (
             getName: TreeItemMap<TFolder, TItem, string>,
-            getIcon?: TreeItemMap<TFolder, TItem, string>|null,
-            getBonus?: TreeItemMap<TFolder, TItem, string>|null,
-            getTooltip?: TreeItemMap<TFolder, TItem, string>|null,
+            getIcon?: TreeItemMap<TFolder, TItem, string|undefined>|null,
+            getBonus?: TreeItemMap<TFolder, TItem, string|undefined>|null,
+            getTooltip?: TreeItemMap<TFolder, TItem, string|undefined>|null,
           ) =>
             new TreeDataSourceConfig(this.options, {
               ...folderConfig,

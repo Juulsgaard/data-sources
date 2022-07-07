@@ -1017,16 +1017,13 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
    * @return icon - The mapped icon value
    * @private
    */
-  private getFolderIcon(folder: TreeFolder<TFolder, TItem>) {
-    return this.treeConfig?.folderIcon
-      ? this.treeConfig!.folderIcon(folder.model, folder)
-      : folder.itemCount > 0 || folder.folderCount > 0 ? 'fas fa-folder' : 'fas fa-folder-blank'
+  private getFolderIcon(folder: TreeFolder<TFolder, TItem>): string {
+    return this.treeConfig?.folderIcon?.(folder.model, folder)
+      ?? (folder.itemCount > 0 || folder.folderCount > 0 ? 'fas fa-folder' : 'fas fa-folder-blank');
   }
 
-  private getItemIcon(item: TreeItem<TFolder, TItem>) {
-    return this.treeConfig?.itemIcon
-      ? this.treeConfig!.itemIcon(item.model, item)
-      : 'fas fa-box'
+  private getItemIcon(item: TreeItem<TFolder, TItem>): string {
+    return this.treeConfig?.itemIcon?.(item.model, item) ?? 'fas fa-box';
   }
   //</editor-fold>
 }

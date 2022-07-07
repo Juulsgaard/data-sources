@@ -167,17 +167,17 @@ export interface TreeMoveActions {
  * Configuration describing the data for the tree rows
  */
 export interface TreeRowConfig<TFolder, TItem> {
-  folderIcon?: TreeFolderMap<TFolder, TItem, string>;
-  itemIcon?: TreeItemMap<TFolder, TItem, string>;
+  folderIcon?: TreeFolderMap<TFolder, TItem, string|undefined>;
+  itemIcon?: TreeItemMap<TFolder, TItem, string|undefined>;
 
   folderName: TreeFolderMap<TFolder, TItem, string>;
   itemName: TreeItemMap<TFolder, TItem, string>;
 
-  folderBonus?: TreeFolderMap<TFolder, TItem, string>;
-  itemBonus?: TreeItemMap<TFolder, TItem, string>;
+  folderBonus?: TreeFolderMap<TFolder, TItem, string|undefined>;
+  itemBonus?: TreeItemMap<TFolder, TItem, string|undefined>;
 
-  folderTooltip?: TreeFolderMap<TFolder, TItem, string>;
-  itemTooltip?: TreeItemMap<TFolder, TItem, string>;
+  folderTooltip?: TreeFolderMap<TFolder, TItem, string|undefined>;
+  itemTooltip?: TreeItemMap<TFolder, TItem, string|undefined>;
 }
 
 //</editor-fold>
