@@ -132,27 +132,30 @@ type SearchColumnItemConfigs<TFolder extends WithId, TItem extends WithId, TData
   [key in keyof typeof RenderDataTypes as Uncapitalize<key>]: SearchColumnItemConfig<TFolder, TData, TItem, RenderDataTypeLookup<typeof RenderDataTypes[key]>>
 };
 
-// TODO: Add builder for hidden Sort and Search columns
-// type HiddenColumnConfigs<TFolder extends WithId, TItem extends WithId> = {
-//   [key in keyof typeof TableColumnTypes as Uncapitalize<key>]: HiddenColumnConfig<TFolder, TItem, TableColumnTypeLookup<typeof TableColumnTypes[key]>>
-// };
-
 class TreeDataSourceConfig<TFolder extends WithId, TItem extends WithId> {
-  public readonly searchColumns = new Map<string, TreeSearchColumnConfig<TFolder, unknown, TItem, unknown>>();
-  public readonly hiddenSearchColumns = new Map<string, TreeHiddenSearchColumnConfig<TFolder, TItem>>();
-  public readonly hiddenSortColumns = new Map<string, TreeHiddenSortColumnConfig<TFolder, TItem, unknown>>();
+  public readonly searchColumns: TreeSearchColumnConfig<TFolder, unknown, TItem, unknown>[] = [];
+  public readonly hiddenSearchColumns: TreeHiddenSearchColumnConfig<TFolder, TItem>[] = [];
 
-  search: {
+  // TODO: Add config builder for sort columns
+  public readonly hiddenSortColumns: TreeHiddenSortColumnConfig<TFolder, TItem, unknown>[] = [];
+
+  column: {
     folder: SearchColumnConfigs<TFolder, TItem>,
     noFolder: (id: string, title?: string) => SearchColumnMidConfig<TFolder, TItem, undefined>,
     path: (getName: TreeFolderMap<TFolder, TItem, string>) => TreeDataSourceConfig<TFolder, TItem>,
   };
 
+  search: {
+    folder(id: string, map: TreeFolderMap<TFolder, TItem, string>, weight?: number): TreeDataSourceConfig<TFolder, TItem>;
+    item(id: string, map: TreeItemMap<TFolder, TItem, string>, weight?: number): TreeDataSourceConfig<TFolder, TItem>;
+  }
+
   constructor(
     public options: TreeDataSourceOptions<TFolder, TItem>,
     public treeConfig?: TreeRowConfig<TFolder, TItem>
   ) {
-    this.search = {
+
+    this.column = {
       folder: arrToObj(
         Object.entries(RenderDataTypes),
         ([key]) => lowerFirst(key),
@@ -164,7 +167,7 @@ class TreeDataSourceConfig<TFolder extends WithId, TItem extends WithId> {
         folder: {mapData: () => undefined, dataType: RenderDataTypes.Void}
       }, this),
 
-      path: (getName) => this.search
+      path: (getName) => this.column
         .folder.string.add('path', 'Path', (_, x) => x.path.map(x => getName(x.model, x)).join('/'))
         .item.string.map((_, {folder}) => [
           ...folder.path.map(x => getName(x.model, x)),
@@ -172,6 +175,17 @@ class TreeDataSourceConfig<TFolder extends WithId, TItem extends WithId> {
         ].join('/'))
         .done()
     };
+
+    this.search = {
+      folder: (id: string, map: TreeFolderMap<TFolder, TItem, string>, weight?: number) => {
+        this.hiddenSearchColumns.push({mapFolder: map, id, weight});
+        return this;
+      },
+      item: (id: string, map: TreeItemMap<TFolder, TItem, string>, weight?: number) => {
+        this.hiddenSearchColumns.push({mapItem: map, id, weight});
+        return this;
+      }
+    }
   }
 
   finish() {
@@ -305,7 +319,7 @@ class SearchColumnFinalConfig<TFolder extends WithId, TFolderData extends Render
   }
 
   done() {
-    this.rootConfig.searchColumns.set(this.config.id, this.config);
+    this.rootConfig.searchColumns.push(this.config);
     return this.rootConfig;
   }
 

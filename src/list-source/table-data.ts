@@ -12,6 +12,7 @@ export interface TableColumn<TItem, TData> {
     sortFn?: SortFn<TItem>;
     defaultSort: boolean;
     searchable: boolean;
+    searchWeight?: number;
 }
 
 export interface TableColumnOptions<TModel, TData> {
@@ -19,11 +20,13 @@ export interface TableColumnOptions<TModel, TData> {
     customSort?: (a: TModel, b: TModel) => number;
     defaultSort?: boolean;
     searchable?: boolean;
+    searchWeight?: number;
 }
 
 export interface HiddenSearchColumn<TModel> {
     id: string;
-    mapData: (model: TModel) => string
+    mapData: (model: TModel) => string;
+    weight?: number;
 }
 
 export interface HiddenSortColumn<TModel, TData> {

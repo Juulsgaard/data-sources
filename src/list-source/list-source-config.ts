@@ -126,7 +126,8 @@ class TableColumnConfig<TModel extends WithId, TData extends RenderDataPrimaryTy
       dataType: this.type,
       sortFn: options?.customSort ?? ((a, b) => this.baseSort(map(a), map(b))),
       defaultSort: !!options?.defaultSort,
-      searchable: !!options?.searchable
+      searchable: !!options?.searchable,
+      searchWeight: options?.searchWeight
     });
     return this.config;
   }
@@ -139,7 +140,8 @@ class TableColumnConfig<TModel extends WithId, TData extends RenderDataPrimaryTy
       dataType: this.type,
       sortFn: options?.customSort ?? ((a, b) => this.baseSort(map(a), map(b))),
       defaultSort: !!options?.defaultSort,
-      searchable: !!options?.searchable
+      searchable: !!options?.searchable,
+      searchWeight: options?.searchWeight
     });
     return this.config;
   }
@@ -150,19 +152,21 @@ class SearchColumnConfig<TModel extends WithId> {
   constructor(private config: ListDataSourceConfig<TModel>) {
   }
 
-  prop(key: KeysOfType<TModel, string>) {
+  prop(key: KeysOfType<TModel, string>, weight?: number) {
     const map = getSelectorFn(key);
     this.config.searchColumns.set(key.toString(), {
       id: key.toString(),
       mapData: map,
+      weight
     });
     return this.config;
   }
 
-  add(id: string, map: (model: TModel) => string) {
+  add(id: string, map: (model: TModel) => string, weight?: number) {
     this.config.searchColumns.set(id, {
       id: id,
       mapData: map,
+      weight
     });
     return this.config;
   }

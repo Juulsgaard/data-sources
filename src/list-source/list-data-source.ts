@@ -23,7 +23,7 @@ export class ListDataSource<TModel extends WithId> {
 
   public sortOptions: SortOption[];
   private sortLookup: Map<string, SortFn<TModel>>;
-  private searchIds: string[] = [];
+  private searchKeys: {weight?: number, key: string}[] = [];
 
   public paginated: boolean;
   public indexSorted: boolean;
@@ -80,8 +80,8 @@ export class ListDataSource<TModel extends WithId> {
       }
     }
 
-    for (let [id] of searchColumns) {
-      this.searchIds.push(id);
+    for (let [id, col] of searchColumns) {
+      this.searchKeys.push({key: id, weight: col.weight});
     }
 
     for (let [id, col] of tableColumns) {
@@ -97,7 +97,7 @@ export class ListDataSource<TModel extends WithId> {
       }
 
       if (col.searchable) {
-        this.searchIds.push(id);
+        this.searchKeys.push({key: id, weight: col.searchWeight});
       }
     }
 
@@ -345,11 +345,13 @@ export class ListDataSource<TModel extends WithId> {
    */
   mapToSearch(list: TModel[]): ListSearchData<TModel>[] {
     return list.map(row => {
-      const search = {} as SimpleObject;
+      const search: Record<string, string> = {};
+
       for (let [id, col] of this.tableColumns) {
         if (!col.searchable) continue;
         search[id] = col.mapData(row)?.toString();
       }
+
       for (let [id, col] of this.searchColumns) {
         search[id] = col.mapData(row);
       }
@@ -368,7 +370,10 @@ export class ListDataSource<TModel extends WithId> {
       this.searcher = new Fuse<ListSearchData<TModel>>(list, {
         includeScore: true,
         shouldSort: true,
-        keys: this.searchIds.map(id => ['search', id])
+        keys: this.searchKeys.map(({key, weight}) => ({
+          name: ['search', key],
+          weight: weight ?? 1
+        }))
       });
       return;
     }

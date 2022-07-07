@@ -42,13 +42,13 @@ export interface TreeRowData {
 //<editor-fold desc="Search Data Structure">
 
 export interface TreeFolderSearchData<TFolder, TItem> {
-  search: SimpleObject;
+  search: Record<string, string>;
   isFolder: true;
   model: TreeFolder<TFolder, TItem>;
 }
 
 export interface TreeItemSearchData<TFolder, TItem> {
-  search: SimpleObject;
+  search: Record<string, string>;
   isFolder: false;
   model: TreeItem<TFolder, TItem>;
 }
@@ -89,6 +89,7 @@ export interface TreeSortConfig<TFolder, TItem, TData> {
 export interface TreeSearchConfig<TFolder, TItem> {
   mapFolder?: TreeFolderMap<TFolder, TItem, string|undefined>;
   mapItem?: TreeItemMap<TFolder, TItem, string|undefined>;
+  weight?: number;
 }
 
 //</editor-fold>

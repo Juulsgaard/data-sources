@@ -70,9 +70,9 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
 
   constructor(
     private readonly options: TreeDataSourceOptions<TFolder, TItem>,
-    private readonly searchColumns: Map<string, TreeSearchColumnConfig<TFolder, any, TItem, any>>,
-    private readonly hiddenSearchColumn: Map<string, TreeHiddenSearchColumnConfig<TFolder, TItem>>,
-    private readonly hiddenSortColumns: Map<string, TreeHiddenSortColumnConfig<TFolder, TItem, any>>,
+    private readonly searchColumns: TreeSearchColumnConfig<TFolder, any, TItem, any>[],
+    private readonly hiddenSearchColumn: TreeHiddenSearchColumnConfig<TFolder, TItem>[],
+    private readonly hiddenSortColumns: TreeHiddenSortColumnConfig<TFolder, TItem, any>[],
     private readonly treeConfig?: TreeRowConfig<TFolder, TItem>,
   ) {
 
@@ -84,26 +84,26 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
 
     this.hasActions = !!options.folderActions.length || !!options.itemActions.length;
 
-    this.columns = mapToArr(this.searchColumns);
+    this.columns = [...this.searchColumns];
 
-    for (let [id, col] of hiddenSortColumns) {
-      this.sortOptions.push({id, name: col.title});
-      this.hiddenSortOptions.push({id, name: col.title});
-      this.sortLookup.set(id, {...col});
+    for (let col of hiddenSortColumns) {
+      this.sortOptions.push({id: col.id, name: col.title});
+      this.hiddenSortOptions.push({id: col.id, name: col.title});
+      this.sortLookup.set(col.id, {...col});
     }
 
-    for (let [id, col] of hiddenSearchColumn) {
-      this.searchConfigs.set(id, col);
+    for (let col of hiddenSearchColumn) {
+      this.searchConfigs.set(col.id, col);
     }
 
-    for (let [id, col] of searchColumns) {
+    for (let col of searchColumns) {
       if (col.sorting) {
         this.sortOptions.push({id: col.id, name: col.title ?? titleCase(col.id)});
         this.sortLookup.set(col.id, col.sorting);
       }
 
       if (col.searching) {
-        this.searchConfigs.set(id, col.searching);
+        this.searchConfigs.set(col.id, col.searching);
       }
     }
 
@@ -772,11 +772,12 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
   private mapFolderSearchData(folders: TreeFolder<TFolder, TItem>[]): TreeFolderSearchData<TFolder, TItem>[] {
 
     return folders.map(folder => {
-      const search = {} as SimpleObject;
+      const search: Record<string, string> = {};
 
       for (let [id, conf] of this.searchConfigs) {
         if (!conf.mapFolder) continue;
-        search[id] = conf.mapFolder(folder.model, folder);
+        const val = conf.mapFolder(folder.model, folder);
+        if (val !== undefined) search[id] = val;
       }
 
       return {model: folder, isFolder: true, search} as TreeFolderSearchData<TFolder, TItem>;
@@ -792,11 +793,12 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
   private mapItemSearchData(items: TreeItem<TFolder, TItem>[]): TreeItemSearchData<TFolder, TItem>[] {
 
     return items.map(item => {
-      const search = {} as SimpleObject;
+      const search: Record<string, string> = {};
 
       for (let [id, conf] of this.searchConfigs) {
         if (!conf.mapItem) continue;
-        search[id] = conf.mapItem(item.model, item);
+        const val = conf.mapItem(item.model, item);
+        if (val !== undefined) search[id] = val;
       }
 
       return {model: item, isFolder: false, search} as TreeItemSearchData<TFolder, TItem>;
@@ -808,8 +810,8 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
     return list.map(({search, ...row}) => {
       const data = {} as SimpleObject;
 
-      for (let [id, col] of this.searchColumns) {
-        data[id] = row.isFolder
+      for (let col of this.searchColumns) {
+        data[col.id] = row.isFolder
           ? col.folder.mapData(row.model.model, row.model)
           : col.item.mapData(row.model.model, row.model);
       }
@@ -863,9 +865,12 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
     this.folderSearcher = new Fuse<TreeFolderSearchData<TFolder, TItem>>(folders, {
       includeScore: true,
       shouldSort: true,
-      keys: mapToArr(this.searchConfigs, (val, key) => ({key, val}))
-        .filter(({val}) => !!val.mapFolder)
-        .map(({key}) => ['search', key])
+      keys: mapToArr(this.searchConfigs, (col, key) => ({key, col}))
+        .filter(({col}) => !!col.mapFolder)
+        .map(({key, col}) => ({
+          name: ['search', key],
+          weight: col.weight ?? 1
+        }))
     });
   }
 
