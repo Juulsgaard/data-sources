@@ -9,13 +9,21 @@ import {isString, WithId} from "@consensus-labs/ts-tools";
 
 class BaseTreeState<TFolder extends WithId, TItem extends WithId> {
 
-  public expandAll$ = new BehaviorSubject<boolean>(false);
+  private readonly _expandAll$ = new BehaviorSubject<boolean>(false)
+  public readonly expandAll$: Observable<boolean> = this._expandAll$.asObservable();
+  set expandAll(expand: boolean) {this._expandAll$.next(expand)}
+  get expandAll() {return this._expandAll$.value}
 
-  private _openFolders$ = new BehaviorSubject<Set<string>>(new Set<string>());
-  public openFolders$: Observable<Set<string>>;
+  private readonly _hideEmpty$ = new BehaviorSubject<boolean>(false)
+  public readonly hideEmpty$: Observable<boolean> = this._hideEmpty$.asObservable();
+  set hideEmpty(expand: boolean) {this._hideEmpty$.next(expand)}
+  get hideEmpty() {return this._hideEmpty$.value}
+
+  private readonly _openFolders$ = new BehaviorSubject<Set<string>>(new Set<string>());
+  public readonly openFolders$: Observable<Set<string>> =  this._openFolders$.asObservable();
 
   constructor(protected dataSource: TreeDataSource<TFolder, TItem>) {
-    this.openFolders$ = this._openFolders$.asObservable();
+
   }
 
   //<editor-fold desc="Open Folders">
