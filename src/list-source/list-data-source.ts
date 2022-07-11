@@ -349,11 +349,13 @@ export class ListDataSource<TModel extends WithId> {
 
       for (let [id, col] of this.tableColumns) {
         if (!col.searchable) continue;
-        search[id] = col.mapData(row)?.toString();
+        const val = col.mapData(row)?.toString();
+        if (val !== undefined) search[id] = val;
       }
 
       for (let [id, col] of this.searchColumns) {
-        search[id] = col.mapData(row);
+        const val = col.mapData(row);
+        if (val !== undefined) search[id] = val;
       }
 
       return {model: row, search};

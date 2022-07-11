@@ -8,11 +8,11 @@ import {arrToObj, getSelectorFn, KeysOfType, lowerFirst, SortFn, WithId} from "@
 
 
 type TableColumnConfigs<TModel extends WithId> = {
-  [key in keyof typeof RenderDataTypes as Uncapitalize<key>]: TableColumnConfig<TModel, RenderDataTypeLookup<typeof RenderDataTypes[key]>>
+  [key in keyof typeof RenderDataTypes as Uncapitalize<key>]: TableColumnConfig<TModel, RenderDataTypeLookup<typeof RenderDataTypes[key]>|undefined>
 };
 
 type SortColumnConfigs<TModel extends WithId> = {
-  [key in keyof typeof RenderDataTypes as Uncapitalize<key>]: SortColumnConfig<TModel, RenderDataTypeLookup<typeof RenderDataTypes[key]>>
+  [key in keyof typeof RenderDataTypes as Uncapitalize<key>]: SortColumnConfig<TModel, RenderDataTypeLookup<typeof RenderDataTypes[key]>|undefined>
 } & {model: SortModelConfig<TModel>};
 
 //<editor-fold desc="Main Config">
@@ -117,7 +117,7 @@ class TableColumnConfig<TModel extends WithId, TData extends RenderDataPrimaryTy
     this.baseSort = getRenderDataTypeSorting(type);
   }
 
-  prop(key: KeysOfType<TModel, TData | undefined>, title: string, options?: TableColumnOptions<TModel, TData>) {
+  prop(key: KeysOfType<TModel, TData>, title: string, options?: TableColumnOptions<TModel, TData>) {
     const map = getSelectorFn(key);
     this.config.tableColumns.set(key.toString(), {
       id: key.toString(),
@@ -152,7 +152,7 @@ class SearchColumnConfig<TModel extends WithId> {
   constructor(private config: ListDataSourceConfig<TModel>) {
   }
 
-  prop(key: KeysOfType<TModel, string>, weight?: number) {
+  prop(key: KeysOfType<TModel, string|undefined>, weight?: number) {
     const map = getSelectorFn(key);
     this.config.searchColumns.set(key.toString(), {
       id: key.toString(),
@@ -180,7 +180,7 @@ class SortColumnConfig<TModel extends WithId, TData extends RenderDataPrimaryTyp
     this.baseSort = getRenderDataTypeSorting(type);
   }
 
-  prop(key: KeysOfType<TModel, TData | undefined>, title: string, defaultSort?: boolean) {
+  prop(key: KeysOfType<TModel, TData>, title: string, defaultSort?: boolean) {
     const map = getSelectorFn(key);
     this.config.sortColumns.set(key.toString(), {
       id: key.toString(),

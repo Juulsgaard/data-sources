@@ -56,14 +56,14 @@ export interface TreeItemSearchData<TFolder, TItem> {
 export type TreeSearchData<TFolder, TItem> = TreeFolderSearchData<TFolder, TItem> | TreeItemSearchData<TFolder, TItem>;
 
 export interface TreeFolderSearchRowData<TFolder, TItem> {
-  data: SimpleObject;
+  data: Record<string, any|undefined>;
   isFolder: true;
   model: TreeFolder<TFolder, TItem>;
   actions: TreeFolderActionConfig<TFolder, TItem>[];
 }
 
 export interface TreeItemSearchRowData<TFolder, TItem> {
-  data: SimpleObject;
+  data: Record<string, any|undefined>;
   isFolder: false;
   model: TreeItem<TFolder, TItem>;
   actions: TreeItemActionConfig<TFolder, TItem>[];

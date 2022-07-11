@@ -114,5 +114,5 @@ export interface ListUniversalData<TModel> {
 
 export interface ListSearchData<TModel> {
     model: TModel;
-    search: Record<string, string>;
+    search: Record<string, string|undefined>;
 }

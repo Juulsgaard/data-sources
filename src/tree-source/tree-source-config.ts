@@ -126,10 +126,10 @@ export class TreeDataOptionConfig<TFolder extends WithId, TItem extends WithId> 
 
 //<editor-fold desc="Table Builder">
 type SearchColumnConfigs<TFolder extends WithId, TItem extends WithId> = {
-  [key in keyof typeof RenderDataTypes as Uncapitalize<key>]: SearchColumnConfig<TFolder, TItem, RenderDataTypeLookup<typeof RenderDataTypes[key]>>
+  [key in keyof typeof RenderDataTypes as Uncapitalize<key>]: SearchColumnConfig<TFolder, TItem, RenderDataTypeLookup<typeof RenderDataTypes[key]>|undefined>
 };
 type SearchColumnItemConfigs<TFolder extends WithId, TItem extends WithId, TData extends RenderDataPrimaryTypes> = {
-  [key in keyof typeof RenderDataTypes as Uncapitalize<key>]: SearchColumnItemConfig<TFolder, TData, TItem, RenderDataTypeLookup<typeof RenderDataTypes[key]>>
+  [key in keyof typeof RenderDataTypes as Uncapitalize<key>]: SearchColumnItemConfig<TFolder, TData, TItem, RenderDataTypeLookup<typeof RenderDataTypes[key]>|undefined>
 };
 
 class TreeDataSourceConfig<TFolder extends WithId, TItem extends WithId> {

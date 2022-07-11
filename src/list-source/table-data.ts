@@ -25,7 +25,7 @@ export interface TableColumnOptions<TModel, TData> {
 
 export interface HiddenSearchColumn<TModel> {
     id: string;
-    mapData: (model: TModel) => string;
+    mapData: (model: TModel) => string|undefined;
     weight?: number;
 }
 
@@ -40,7 +40,7 @@ export interface HiddenSortColumn<TModel, TData> {
 export interface TableData<TModel> {
     id: string;
     model: TModel;
-    data: SimpleObject;
+    data: Record<string, any|undefined>;
     actions: ListActionConfig<TModel>[];
     flags: ListFlagData[];
 }
