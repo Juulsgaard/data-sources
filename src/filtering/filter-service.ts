@@ -4,6 +4,7 @@ import {BaseTreeFolder, BaseTreeItem} from "../tree-source/tree-data";
 import {deepCopy} from "@consensus-labs/ts-tools";
 import {FilterAdapter, FilterSaveState, MappedReadState} from "./filter-adapter";
 import {DataFilter, IndividualDataFilter} from "./data-filter";
+import {cache} from "../lib/rxjs";
 
 export class FilterServiceState<TFilter, TModel> {
 
@@ -28,18 +29,8 @@ export abstract class FilterService<TFilter, TModel> {
 
     private _filters: DataFilter<TFilter, TModel>[] = [];
 
-    private _filter$ = new BehaviorSubject<FilterServiceState<TFilter, TModel> | undefined>(undefined);
-    get filter$() {
-        return this._filter$.pipe(throttleTime(1000, asyncScheduler, {leading: true, trailing: true}));
-    }
-
-    private _activeFilters$ = new BehaviorSubject(0);
-    get activeFilters(): number {
-        return this._filters.reduce((acc, x) => x.isActive(this.state) ? acc + 1 : acc, 0);
-    }
-    get activeFilters$() {
-        return this._activeFilters$.pipe(distinctUntilChanged());
-    }
+    filter$: Observable<FilterServiceState<TFilter, TModel>>;
+    activeFilters$: Observable<number>;
 
     private readonly _resetState: TFilter;
 
@@ -48,12 +39,24 @@ export abstract class FilterService<TFilter, TModel> {
     get state() {return this._state$.value}
     set state(state: TFilter) {this._state$.next(state)}
 
-    set delta(state: Partial<TFilter>) {this.state = {...this.state, state}};
+    set delta(state: Partial<TFilter>) {this.state = {...this.state, ...state}};
 
     protected constructor(state: TFilter, private saveAdapter?: FilterAdapter) {
         this._resetState = deepCopy(state);
         this._state$ = new BehaviorSubject(state);
         this.state$ = this._state$.asObservable();
+
+        this.activeFilters$ = this.state$.pipe(
+          throttleTime(200, asyncScheduler, {leading: true, trailing: false}),
+          map(state => this._filters.reduce((acc, x) => x.isActive(state) ? acc + 1 : acc, 0)),
+          cache()
+        );
+
+        this.filter$ = this.state$.pipe(
+          throttleTime(500, asyncScheduler, {leading: true, trailing: false}),
+          map(state => new FilterServiceState<TFilter, TModel>(state, this._filters)),
+          cache()
+        );
     }
 
     protected addFullFilter(isActive: (filter: TFilter) => boolean, filter: (list: TModel[], filter: TFilter) => TModel[]) {
@@ -76,8 +79,6 @@ export abstract class FilterService<TFilter, TModel> {
 
     dispose() {
         this.clearFilter();
-        this._filter$.complete();
-        this._activeFilters$.complete();
         this._serializerSub?.unsubscribe();
     }
 
