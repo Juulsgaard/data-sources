@@ -1,8 +1,8 @@
-import {asyncScheduler, BehaviorSubject, Observable, Subscription} from "rxjs";
-import {distinctUntilChanged, map, throttleTime} from "rxjs/operators";
+import {asyncScheduler, BehaviorSubject, EMPTY, Observable, Subscription} from "rxjs";
+import {catchError, distinctUntilChanged, map, throttleTime} from "rxjs/operators";
 import {BaseTreeFolder, BaseTreeItem} from "../tree-source/tree-data";
 import {deepCopy} from "@consensus-labs/ts-tools";
-import {FilterAdapter, FilterSaveState} from "./filter-adapter";
+import {FilterAdapter, FilterSaveState, MappedReadState} from "./filter-adapter";
 
 export class FilterServiceState<TFilter, TModel> {
 
@@ -82,22 +82,33 @@ export abstract class FilterService<TFilter, TModel> {
 
     private _serializerSub?: Subscription;
 
-    public withSerializer(serialize: (filter: TFilter) => FilterSaveState, deserialize: (state: FilterSaveState) => Partial<TFilter>, subscribe = false) {
+    public withSerializer<TState extends FilterSaveState>(serialize: (filter: TFilter) => TState, deserialize: (state: MappedReadState<TState>) => Partial<TFilter>, subscribe = false) {
         if (!this.saveAdapter) throw Error(`Can't use a filter serializer without an adapter`);
         this._serializerSub = new Subscription();
 
         this._serializerSub.add(this._state$.pipe(
           throttleTime(500, asyncScheduler, {leading: true, trailing: true}),
           map(serialize),
+          catchError(err => {
+              console.log('Failed to serialize filter', this.constructor.name, err);
+              return EMPTY;
+          }),
           distinctUntilChanged()
         ).subscribe(state => this.saveAdapter?.writeState(state)));
 
         if (subscribe) {
             this._serializerSub.add(this.saveAdapter.subscribe().pipe(
-              map(deserialize)
+              map(x => deserialize(x as MappedReadState<TState>)),
+              catchError(err => {
+                  console.log('Failed to deserialize filter', this.constructor.name, err);
+                  return EMPTY;
+              })
             ).subscribe(state => this.delta = state));
         } else {
-            this.saveAdapter.readState().then(deserialize).then(state => this.delta = state);
+            this.saveAdapter.readState().then(x => deserialize(x as MappedReadState<TState>)).then(
+              state => this.delta = state,
+              err =>  console.log('Failed to deserialize filter', this.constructor.name, err)
+            );
         }
     }
 }
