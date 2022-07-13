@@ -82,7 +82,7 @@ export abstract class FilterService<TFilter, TModel> {
 
     private _serializerSub?: Subscription;
 
-    public withSerializer(serialize: (filter: TFilter) => FilterSaveState, deserialize: (state: FilterSaveState) => Partial<TFilter>) {
+    public withSerializer(serialize: (filter: TFilter) => FilterSaveState, deserialize: (state: FilterSaveState) => Partial<TFilter>, subscribe = false) {
         if (!this.saveAdapter) throw Error(`Can't use a filter serializer without an adapter`);
         this._serializerSub = new Subscription();
 
@@ -92,9 +92,13 @@ export abstract class FilterService<TFilter, TModel> {
           distinctUntilChanged()
         ).subscribe(state => this.saveAdapter?.writeState(state)));
 
-        this._serializerSub.add(this.saveAdapter.readState().pipe(
-          map(deserialize)
-        ).subscribe(state => this.delta = state));
+        if (subscribe) {
+            this._serializerSub.add(this.saveAdapter.subscribe().pipe(
+              map(deserialize)
+            ).subscribe(state => this.delta = state));
+        } else {
+            this.saveAdapter.readState().then(deserialize).then(state => this.delta = state);
+        }
     }
 }
 

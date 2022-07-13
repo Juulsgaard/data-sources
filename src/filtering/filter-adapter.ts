@@ -5,6 +5,7 @@ export type FilterSaveState = Record<string, string|number|string[]|number[]|und
 export interface FilterAdapter {
 
   writeState(state: FilterSaveState): Promise<void>;
-  readState(): Observable<FilterSaveState>;
+  readState(): Promise<FilterSaveState>;
+  subscribe(): Observable<FilterSaveState>;
 
 }
