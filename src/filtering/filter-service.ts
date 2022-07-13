@@ -1,34 +1,8 @@
-import {asyncScheduler, BehaviorSubject} from "rxjs";
-import {distinctUntilChanged, throttleTime} from "rxjs/operators";
-import {BaseTreeFolder, BaseTreeItem} from "./tree-source/tree-data";
+import {asyncScheduler, BehaviorSubject, Observable, Subscription} from "rxjs";
+import {distinctUntilChanged, map, throttleTime} from "rxjs/operators";
+import {BaseTreeFolder, BaseTreeItem} from "../tree-source/tree-data";
 import {deepCopy} from "@consensus-labs/ts-tools";
-
-class DataFilter<TFilter, TModel> {
-    constructor(
-        private readonly _filter: (list: TModel[], filter: TFilter) => TModel[],
-        private readonly _isActive: (filter: TFilter) => boolean
-    ) {
-
-    }
-
-    isActive(filter: TFilter) {
-        return this._isActive(filter)
-    }
-
-    filter(filter: TFilter, list: TModel[]) {
-        if (!this.isActive(filter)) return list;
-        return this._filter(list, filter);
-    }
-}
-
-class IndividualDataFilter<TFilter, TModel> extends DataFilter<TFilter, TModel> {
-    constructor(
-        filter: (data: TModel, filter: TFilter) => boolean,
-        isActive: (filter: TFilter) => boolean
-    ) {
-        super((list, f) => list.filter(x => filter(x, f)), isActive);
-    }
-}
+import {FilterAdapter, FilterSaveState} from "./filter-adapter";
 
 export class FilterServiceState<TFilter, TModel> {
 
@@ -68,8 +42,17 @@ export abstract class FilterService<TFilter, TModel> {
 
     private readonly _resetState: TFilter;
 
-    protected constructor(public state: TFilter) {
+    private _state$: BehaviorSubject<TFilter>;
+    public state$: Observable<TFilter>;
+    get state() {return this._state$.value}
+    set state(state: TFilter) {this._state$.next(state)}
+
+    set delta(state: Partial<TFilter>) {this.state = {...this.state, state}};
+
+    protected constructor(state: TFilter, private saveAdapter?: FilterAdapter) {
         this._resetState = deepCopy(state);
+        this._state$ = new BehaviorSubject(state);
+        this.state$ = this._state$.asObservable();
     }
 
     protected addFullFilter(isActive: (filter: TFilter) => boolean, filter: (list: TModel[], filter: TFilter) => TModel[]) {
@@ -80,14 +63,38 @@ export abstract class FilterService<TFilter, TModel> {
         this._filters.push(new IndividualDataFilter<TFilter, TModel>(filter, isActive));
     }
 
-    protected commit() {
-        this._filter$.next(new FilterServiceState<TFilter, TModel>(this.state, this._filters));
-        this._activeFilters$.next(this.activeFilters);
+    protected update(change: (state: TFilter) => Partial<TFilter>) {
+        const result = change(this.state);
+        if (this.state === result) return;
+        this.delta = result;
     }
 
     public clearFilter() {
         this.state = deepCopy(this._resetState);
-        this.commit();
+    }
+
+    dispose() {
+        this.clearFilter();
+        this._filter$.complete();
+        this._activeFilters$.complete();
+        this._serializerSub?.unsubscribe();
+    }
+
+    private _serializerSub?: Subscription;
+
+    public withSerializer(serialize: (filter: TFilter) => FilterSaveState, deserialize: (state: FilterSaveState) => Partial<TFilter>) {
+        if (!this.saveAdapter) throw Error(`Can't use a filter serializer without an adapter`);
+        this._serializerSub = new Subscription();
+
+        this._serializerSub.add(this._state$.pipe(
+          throttleTime(500, asyncScheduler, {leading: true, trailing: true}),
+          map(serialize),
+          distinctUntilChanged()
+        ).subscribe(state => this.saveAdapter?.writeState(state)));
+
+        this._serializerSub.add(this.saveAdapter.readState().pipe(
+          map(deserialize)
+        ).subscribe(state => this.delta = state));
     }
 }
 

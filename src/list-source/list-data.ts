@@ -1,5 +1,5 @@
 //<editor-fold desc="List Data">
-import {FilterService} from "../filter.service";
+import {FilterService} from "../filtering/filter-service";
 import {ListFlagData} from "./table-data";
 import {SimpleObject} from "@consensus-labs/ts-tools";
 import {ThemeColor} from "../lib/types";

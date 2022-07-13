@@ -6,7 +6,7 @@ import {
   TreeFolderSearchData, TreeFolderSearchRowData, TreeHiddenSearchColumnConfig, TreeHiddenSortColumnConfig, TreeItem, TreeItemData, TreeItemSearchData,
   TreeItemSearchRowData, TreeRowConfig, TreeSearchColumnConfig, TreeSearchConfig, TreeSearchData, TreeSearchRowData, TreeSortConfig
 } from "./tree-data";
-import {TreeFolderFilterState, TreeItemFilterState} from "../filter.service";
+import {TreeFolderFilterState, TreeItemFilterState} from "../filtering/filter-service";
 import {BulkRelocateModel, MoveModel} from "../models/move";
 import {cache} from "../lib/rxjs";
 import {TreeDataOptionConfig} from "./tree-source-config";

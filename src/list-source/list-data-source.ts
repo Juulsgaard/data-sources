@@ -1,7 +1,7 @@
 import {asyncScheduler, BehaviorSubject, combineLatest, merge, Observable, of, ReplaySubject} from "rxjs";
 import {catchError, map, switchMap, tap, throttleTime} from "rxjs/operators";
 import Fuse from "fuse.js";
-import {FilterServiceState} from "../filter.service";
+import {FilterServiceState} from "../filtering/filter-service";
 import {GridData, GridDataConfig, ListData, ListDataConfig, ListDataSourceOptions, ListSearchData, ListUniversalData} from "./list-data";
 import {ListDataSourceConfig} from "./list-source-config";
 import {HiddenSearchColumn, HiddenSortColumn, TableColumn, TableData} from "./table-data";

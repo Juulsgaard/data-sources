@@ -1,5 +1,5 @@
 import {RenderDataPrimaryTypes, RenderDataType, RenderDataTypeLookup, RenderDataTypes} from "../models/render-types";
-import {FilterService} from "../filter.service";
+import {FilterService} from "../filtering/filter-service";
 import {GridDataConfig, ListActionOptions, ListDataConfig, ListDataSourceOptions} from "./list-data";
 import {HiddenSearchColumn, HiddenSortColumn, TableColumn, TableColumnOptions} from "./table-data";
 import {ListDataSource} from "./list-data-source";

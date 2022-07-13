@@ -1,5 +1,5 @@
 
-import {TreeFolderFilterService, TreeItemFilterService} from "../filter.service";
+import {TreeFolderFilterService, TreeItemFilterService} from "../filtering/filter-service";
 import {RenderDataType} from "../models/render-types";
 import {BulkRelocateModel, MoveModel} from "../models/move";
 import {Selection, SimpleObject, SortFn} from "@consensus-labs/ts-tools";

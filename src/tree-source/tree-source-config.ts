@@ -5,7 +5,7 @@ import {
 import {RenderDataPrimaryTypes, RenderDataType, RenderDataTypeLookup, RenderDataTypes} from "../models/render-types";
 import {getRenderDataTypeSorting} from "../lib/sorting";
 import {TreeDataSource} from "./tree-data-source";
-import {TreeFolderFilterService, TreeItemFilterService} from "../filter.service";
+import {TreeFolderFilterService, TreeItemFilterService} from "../filtering/filter-service";
 import {ISorted, sortByIndexAsc} from "../lib/index-sort";
 import {arrToObj, Conditional, getSelectorFn, KeysOfType, lowerFirst, Selection, WithId} from "@consensus-labs/ts-tools";
 
