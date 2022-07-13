@@ -1,5 +1,5 @@
 
-class DataFilter<TFilter, TModel> {
+export class DataFilter<TFilter, TModel> {
   constructor(
     private readonly _filter: (list: TModel[], filter: TFilter) => TModel[],
     private readonly _isActive: (filter: TFilter) => boolean
@@ -17,7 +17,7 @@ class DataFilter<TFilter, TModel> {
   }
 }
 
-class IndividualDataFilter<TFilter, TModel> extends DataFilter<TFilter, TModel> {
+export class IndividualDataFilter<TFilter, TModel> extends DataFilter<TFilter, TModel> {
   constructor(
     filter: (data: TModel, filter: TFilter) => boolean,
     isActive: (filter: TFilter) => boolean

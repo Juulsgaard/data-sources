@@ -3,6 +3,7 @@ import {catchError, distinctUntilChanged, map, throttleTime} from "rxjs/operator
 import {BaseTreeFolder, BaseTreeItem} from "../tree-source/tree-data";
 import {deepCopy} from "@consensus-labs/ts-tools";
 import {FilterAdapter, FilterSaveState, MappedReadState} from "./filter-adapter";
+import {DataFilter, IndividualDataFilter} from "./data-filter";
 
 export class FilterServiceState<TFilter, TModel> {
 
