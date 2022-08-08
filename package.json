@@ -40,5 +40,6 @@
   },
   "dependencies": {
     "tslib": "^2.4.0"
-  }
+  },
+  "packageManager": "pnpm@7.8.0"
 }
