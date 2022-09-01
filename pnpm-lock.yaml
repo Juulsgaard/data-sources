@@ -1,7 +1,7 @@
 lockfileVersion: 5.4
 
 specifiers:
-  '@consensus-labs/ts-tools': 1.1.0
+  '@consensus-labs/ts-tools': 1.1.1
   '@types/jest': ^28.1.1
   fuse.js: ^6.6.0
   jest: ^28.1.1
@@ -16,7 +16,7 @@ dependencies:
   tslib: 2.4.0
 
 devDependencies:
-  '@consensus-labs/ts-tools': 1.1.0
+  '@consensus-labs/ts-tools': 1.1.1
   '@types/jest': 28.1.6
   fuse.js: 6.6.2
   jest: 28.1.3
@@ -357,8 +357,8 @@ packages:
     resolution: {integrity: sha512-0hYQ8SB4Db5zvZB4axdMHGwEaQjkZzFjQiN9LVYvIFB2nSUHW9tYpxWriPrWDASIxiaXax83REcLxuSdnGPZtw==}
     dev: true
 
-  /@consensus-labs/ts-tools/1.1.0:
-    resolution: {integrity: sha1-y42OJXwyWAub13hcMxHN2Ph+Nug=, tarball: https://gitlab.com/api/v4/projects/36928519/packages/npm/@consensus-labs/ts-tools/-/@consensus-labs/ts-tools-1.1.0.tgz}
+  /@consensus-labs/ts-tools/1.1.1:
+    resolution: {integrity: sha1-ieYVRVJbVgUiM8BuzwlsCHsGzfU=, tarball: https://gitlab.com/api/v4/projects/36928519/packages/npm/@consensus-labs/ts-tools/-/@consensus-labs/ts-tools-1.1.1.tgz}
     dev: true
 
   /@istanbuljs/load-nyc-config/1.1.0:
