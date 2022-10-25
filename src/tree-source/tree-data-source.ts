@@ -1,5 +1,5 @@
 import {asyncScheduler, auditTime, BehaviorSubject, combineLatest, merge, Observable, of, ReplaySubject} from "rxjs";
-import {catchError, map, switchMap, tap, throttleTime} from "rxjs/operators";
+import {catchError, distinctUntilChanged, map, switchMap, tap, throttleTime} from "rxjs/operators";
 import Fuse from "fuse.js";
 import {
   BaseTreeFolder, BaseTreeItem, TreeAsideData, TreeAsideFolderData, TreeAsideItemData, TreeDataSourceOptions, TreeFolder, TreeFolderData,
@@ -111,11 +111,13 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
     this.folderFilter$ = this.options.folderFilterService?.filter$ ?? of(undefined);
 
     const folderFilterActive$ = this.options.folderFilterService?.activeFilters$?.pipe(
-      map(x => x > 0)
+      map(x => x > 0),
+      distinctUntilChanged()
     ) ?? of(false);
 
     this.foldersFiltered$ = combineLatest([this.folderBlackList$, folderFilterActive$]).pipe(
       map(([blacklist, filtered]) => !!blacklist.length || filtered),
+      distinctUntilChanged(),
       cache()
     );
 
@@ -124,11 +126,13 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
     this.itemFilter$ = this.options.itemFilterService?.filter$ ?? of(undefined);
 
     const itemFilterActive$ = this.options.itemFilterService?.activeFilters$?.pipe(
-      map(x => x > 0)
+      map(x => x > 0),
+      distinctUntilChanged()
     ) ?? of(false);
 
     this.itemsFiltered$ = combineLatest([this.itemBlackList$, itemFilterActive$]).pipe(
       map(([blacklist, filtered]) => !!blacklist.length || filtered),
+      distinctUntilChanged(),
       cache()
     );
 
@@ -262,8 +266,8 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
     //</editor-fold>
 
     // State
-    this.foldersEmpty$ = this.folderList$.pipe(map(x => !x.length));
-    this.itemsEmpty$ = this.itemList$.pipe(map(x => !x.length));
+    this.foldersEmpty$ = this.folderList$.pipe(map(x => !x.length), distinctUntilChanged());
+    this.itemsEmpty$ = this.itemList$.pipe(map(x => !x.length), distinctUntilChanged());
 
 
     // Filtering
@@ -320,6 +324,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
 
     this.searching$ = searchQuery$.pipe(
       map(x => !!x?.length),
+      distinctUntilChanged(),
       cache()
     );
 

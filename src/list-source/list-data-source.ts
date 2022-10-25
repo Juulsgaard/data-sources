@@ -1,5 +1,5 @@
 import {asyncScheduler, BehaviorSubject, combineLatest, merge, Observable, of, ReplaySubject} from "rxjs";
-import {catchError, map, switchMap, tap, throttleTime} from "rxjs/operators";
+import {catchError, distinctUntilChanged, map, switchMap, tap, throttleTime} from "rxjs/operators";
 import Fuse from "fuse.js";
 import {FilterServiceState} from "../filtering/filter-service";
 import {GridData, GridDataConfig, ListData, ListDataConfig, ListDataSourceOptions, ListSearchData, ListUniversalData} from "./list-data";
@@ -32,16 +32,17 @@ export class ListDataSource<TModel extends WithId> {
   public listFallbackImage?: string;
 
   //<editor-fold desc="Outputs">
-  private universalData$: Observable<ListUniversalData<TModel>[]>;
+  public simpleData$: Observable<ListUniversalData<TModel>[]>;
   public tableData$: Observable<TableData<TModel>[]>;
   public listData$: Observable<ListData<TModel>[]>;
   public gridData$: Observable<GridData<TModel>[]>;
 
-  private universalSearchData$: Observable<ListUniversalData<TModel>[]>;
+  public simpleSearchData$: Observable<ListUniversalData<TModel>[]>;
   public tableSearchData$: Observable<TableData<TModel>[]>;
   public listSearchData$: Observable<ListData<TModel>[]>;
   public gridSearchData$: Observable<GridData<TModel>[]>;
 
+  public simpleDisplayData$: Observable<ListUniversalData<TModel>[]>;
   public tableDisplayData$: Observable<TableData<TModel>[]>;
   public listDisplayData$: Observable<ListData<TModel>[]>;
   public gridDisplayData$: Observable<GridData<TModel>[]>;
@@ -124,7 +125,7 @@ export class ListDataSource<TModel extends WithId> {
     );
 
     // State
-    this.empty$ = this.itemList$.pipe(map(x => !x.length));
+    this.empty$ = this.itemList$.pipe(map(x => !x.length), distinctUntilChanged());
 
 
     // Filtering
@@ -136,6 +137,7 @@ export class ListDataSource<TModel extends WithId> {
 
     const activeFilter$ = this.options.filterService?.activeFilters$?.pipe(
       map(x => x > 0),
+      distinctUntilChanged(),
       cache()
     ) ?? of(false);
 
@@ -152,6 +154,7 @@ export class ListDataSource<TModel extends WithId> {
 
     this.searching$ = searchQuery$.pipe(
       map(x => !!x?.length),
+      distinctUntilChanged(),
       cache()
     );
 
@@ -171,22 +174,22 @@ export class ListDataSource<TModel extends WithId> {
       map(list => list.map(x => x.item.model))
     );
 
-    this.universalSearchData$ = searchData$.pipe(
+    this.simpleSearchData$ = searchData$.pipe(
       map(x => this.mapToUniversal(x)),
       cache()
     );
 
-    this.tableSearchData$ = this.universalSearchData$.pipe(
+    this.tableSearchData$ = this.simpleSearchData$.pipe(
       map(x => this.mapToTable(x)),
       cache(),
     );
 
-    this.listSearchData$ = this.universalSearchData$.pipe(
+    this.listSearchData$ = this.simpleSearchData$.pipe(
       map(x => this.mapToList(x)),
       cache(),
     );
 
-    this.gridSearchData$ = this.universalSearchData$.pipe(
+    this.gridSearchData$ = this.simpleSearchData$.pipe(
       map(x => this.mapToGrid(x)),
       cache()
     );
@@ -202,29 +205,38 @@ export class ListDataSource<TModel extends WithId> {
     )
 
     // Outputs
-    this.universalData$ = paginated$.pipe(
+    this.simpleData$ = paginated$.pipe(
       map(x => this.mapToUniversal(x)),
       cache()
     );
 
-    this.tableData$ = this.universalData$.pipe(
+    this.tableData$ = this.simpleData$.pipe(
       map(x => this.mapToTable(x)),
       cache(),
     );
 
-    this.listData$ = this.universalData$.pipe(
+    this.listData$ = this.simpleData$.pipe(
       map(x => this.mapToList(x)),
       cache(),
     );
 
-    this.gridData$ = this.universalData$.pipe(
+    this.gridData$ = this.simpleData$.pipe(
       map(x => this.mapToGrid(x)),
       cache()
     );
 
-    this.tableDisplayData$ = this.searching$.pipe(switchMap((x) => x ? this.tableSearchData$ : this.tableData$));
-    this.listDisplayData$ = this.searching$.pipe(switchMap((x) => x ? this.listSearchData$ : this.listData$));
-    this.gridDisplayData$ = this.searching$.pipe(switchMap((x) => x ? this.gridSearchData$ : this.gridData$));
+    this.simpleDisplayData$ = this.searching$.pipe(
+      switchMap((x) => x ? this.simpleSearchData$ : this.simpleData$)
+    );
+    this.tableDisplayData$ = this.searching$.pipe(
+      switchMap((x) => x ? this.tableSearchData$ : this.tableData$)
+    );
+    this.listDisplayData$ = this.searching$.pipe(
+      switchMap((x) => x ? this.listSearchData$ : this.listData$)
+    );
+    this.gridDisplayData$ = this.searching$.pipe(
+      switchMap((x) => x ? this.gridSearchData$ : this.gridData$)
+    );
     //</editor-fold>
   }
 
