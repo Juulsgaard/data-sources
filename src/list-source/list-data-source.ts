@@ -106,6 +106,10 @@ export class ListDataSource<TModel extends WithId> {
       this.columnIds.push('_actions');
     }
 
+    if (this.options.flags.length) {
+      this.columnIds.push('_flags');
+    }
+
     this.page$ = new BehaviorSubject<Pagination>({page: 0, pageSize: options.pageSize});
 
     this.filter$ = this.options.filterService?.filter$ ?? of(undefined)
