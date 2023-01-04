@@ -1,7 +1,9 @@
 import {RenderDataPrimaryTypes, RenderDataType, RenderDataTypeLookup, RenderDataTypes} from "../models/render-types";
 import {FilterService} from "../filtering/filter-service";
-import {GridDataConfig, ListActionOptions, ListDataConfig, ListDataSourceOptions} from "./list-data";
-import {HiddenSearchColumn, HiddenSortColumn, TableColumn, TableColumnOptions} from "./table-data";
+import {
+  GridDataConfig, HiddenSearchColumn, HiddenSortColumn, ListActionOptions, ListDataConfig, ListDataSourceOptions,
+  TableColumn, TableColumnOptions
+} from "./list-data";
 import {ListDataSource} from "./list-data-source";
 import {getRenderDataTypeSorting} from "../lib/sorting";
 import {arrToObj, getSelectorFn, KeysOfType, lowerFirst, SortFn, WithId} from "@consensus-labs/ts-tools";
@@ -15,8 +17,87 @@ type SortColumnConfigs<TModel extends WithId> = {
   [key in keyof typeof RenderDataTypes as Uncapitalize<key>]: SortColumnConfig<TModel, RenderDataTypeLookup<typeof RenderDataTypes[key]>|undefined>
 } & {model: SortModelConfig<TModel>};
 
+//<editor-fold desc="Interfaces">
+export interface IListDataSourceConfig<TModel extends WithId> {
+
+  /** Define a table columns for the Table Rendering */
+  table: TableColumnConfigs<TModel>;
+  /** Define searchable data */
+  search: SearchColumnConfig<TModel>;
+  /** Define custom sorting for the data source */
+  sort: SortColumnConfigs<TModel>;
+
+  /**
+   * Add List Rendering to the data source
+   * @param firstLine - Define data for the first line in the List Rendering
+   */
+  addList(firstLine: (model: TModel) => string): ListConfig<TModel>;
+
+  /**
+   * Add Grind Rendering to the data source
+   * @param title - Define data for the grid tile title in the List Rendering
+   */
+  addGrid(title: (model: TModel) => string): GridConfig<TModel>;
+
+  /**
+   * Define a flag for the items
+   * Flags are optional icons that can be shown next to items
+   * @param name - The name of the flag
+   * @param icon - The icon used for rendering the flag
+   * @param filter - A filter to determine if the flag should be shown
+   * @param inactiveIcon - Define an icon for when the flag is not active
+   */
+  addFlag(name: string, icon: string, filter: (model: TModel) => boolean, inactiveIcon?: string): this;
+
+  /**
+   * Define an actions that can be performed for an item
+   * @param name - The display name of the action
+   * @param icon - The icon to show with the action
+   * @param action - The action to perform
+   * @param options - Options for configuring the action
+   */
+  addAction(name: string, icon: string, action: (data: TModel) => any, options?: ListActionOptions<TModel>): this;
+
+  /**
+   * Define a navigation that can be performed for an item
+   * @param name - The display name of the action
+   * @param icon - The icon to show with the action
+   * @param route - Define the mapping for the route to use
+   * @param options - Options for configuring the action
+   */
+  addNavigation(name: string, icon: string, route: (data: TModel) => string[], options?: ListActionOptions<TModel>): this;
+
+  /**
+   * Sort the list by an index property
+   */
+  hasIndexSorting(): this;
+
+  /**
+   * Add pagination to the data source
+   * @param pageSize
+   */
+  withPagination(pageSize?: number): this;
+
+  /**
+   * Attach a filter service to the data source
+   * @param service - The filter service
+   */
+  withFilterService(service: FilterService<any, TModel>): this;
+
+  /**
+   * Make the sorting default to descending order
+   */
+  defaultSortDesc(): this;
+
+  /**
+   * Finish the data source setup
+   */
+  finish(): ListDataSource<TModel>;
+}
+//</editor-fold>
+
 //<editor-fold desc="Main Config">
-export class ListDataSourceConfig<TModel extends WithId> {
+export class ListDataSourceConfig<TModel extends WithId> implements IListDataSourceConfig<TModel> {
 
   tableColumns: Map<string, TableColumn<TModel, any>> = new Map<string, TableColumn<TModel, any>>();
   searchColumns: Map<string, HiddenSearchColumn<TModel>> = new Map<string, HiddenSearchColumn<TModel>>();
@@ -80,6 +161,16 @@ export class ListDataSourceConfig<TModel extends WithId> {
     return this;
   }
 
+  addNavigation(name: string, icon: string, route: (data: TModel) => string[], options?: ListActionOptions<TModel>) {
+    this.options.actions.push({
+      name,
+      icon,
+      route,
+      ...options
+    });
+    return this;
+  }
+
   hasIndexSorting() {
     this.options.indexSorted = true;
     return this;
@@ -111,12 +202,18 @@ export class ListDataSourceConfig<TModel extends WithId> {
 //<editor-fold desc="Column Config">
 class TableColumnConfig<TModel extends WithId, TData extends RenderDataPrimaryTypes> {
 
-  baseSort: SortFn<TData|undefined>;
+  private readonly baseSort: SortFn<TData|undefined>;
 
   constructor(private type: RenderDataType<TData>, private config: ListDataSourceConfig<TModel>) {
     this.baseSort = getRenderDataTypeSorting(type);
   }
 
+  /**
+   * Define a column based on a property
+   * @param key - The property to use
+   * @param title - The column name
+   * @param options - Column options
+   */
   prop(key: KeysOfType<TModel, TData>, title: string, options?: TableColumnOptions<TModel, TData>) {
     const map = getSelectorFn(key);
     this.config.tableColumns.set(key.toString(), {
@@ -132,6 +229,13 @@ class TableColumnConfig<TModel extends WithId, TData extends RenderDataPrimaryTy
     return this.config;
   }
 
+  /**
+   * Define a custom column based on a custom mopping
+   * @param id - ID of the new column
+   * @param title - The name of the column
+   * @param map - Data mapping for the column
+   * @param options - Column options
+   */
   add(id: string, title: string, map: (model: TModel) => TData, options?: TableColumnOptions<TModel, TData>) {
     this.config.tableColumns.set(id, {
       id,
@@ -152,6 +256,11 @@ class SearchColumnConfig<TModel extends WithId> {
   constructor(private config: ListDataSourceConfig<TModel>) {
   }
 
+  /**
+   * Search based on an existing property
+   * @param key - The property to use
+   * @param weight - Optional search weighting
+   */
   prop(key: KeysOfType<TModel, string|undefined>, weight?: number) {
     const map = getSelectorFn(key);
     this.config.searchColumns.set(key.toString(), {
@@ -162,6 +271,12 @@ class SearchColumnConfig<TModel extends WithId> {
     return this.config;
   }
 
+  /**
+   * Define custom search data
+   * @param id - ID of the data
+   * @param map - Define the data mapping
+   * @param weight - Optional search weighting
+   */
   add(id: string, map: (model: TModel) => string, weight?: number) {
     this.config.searchColumns.set(id, {
       id: id,
@@ -174,12 +289,18 @@ class SearchColumnConfig<TModel extends WithId> {
 
 class SortColumnConfig<TModel extends WithId, TData extends RenderDataPrimaryTypes> {
 
-  baseSort: SortFn<TData|undefined>;
+  private readonly baseSort: SortFn<TData|undefined>;
 
   constructor(type: RenderDataType<TData>, private config: ListDataSourceConfig<TModel>) {
     this.baseSort = getRenderDataTypeSorting(type);
   }
 
+  /**
+   * Add sorting based on an existing property
+   * @param key - The property
+   * @param title - The sorting name
+   * @param defaultSort - Define if this should be the default sort
+   */
   prop(key: KeysOfType<TModel, TData>, title: string, defaultSort?: boolean) {
     const map = getSelectorFn(key);
     this.config.sortColumns.set(key.toString(), {
@@ -191,6 +312,13 @@ class SortColumnConfig<TModel extends WithId, TData extends RenderDataPrimaryTyp
     return this.config;
   }
 
+  /**
+   * Define a custom sorting based on data mapping
+   * @param id - The ID of the sort
+   * @param map - The data used for the sorting
+   * @param title - The name of the sort
+   * @param defaultSort - Define if this should be the default sort
+   */
   add(id: string, map: (model: TModel) => TData, title: string, defaultSort?: boolean) {
     this.config.sortColumns.set(id, {
       id,
@@ -207,6 +335,13 @@ class SortModelConfig<TModel extends WithId> {
   constructor(private config: ListDataSourceConfig<TModel>) {
   }
 
+  /**
+   * Define the model sort
+   * @param id - ID of the sort
+   * @param title - The name of the sort
+   * @param sort - The sorting method
+   * @param defaultSort - Define if this should be the default sort
+   */
   add(id: string, title: string, sort: SortFn<TModel>, defaultSort?: boolean) {
     this.config.sortColumns.set(id, {
       id: id,
@@ -226,36 +361,64 @@ class ListConfig<TModel extends WithId> {
   constructor(private config: ListDataSourceConfig<TModel>) {
   }
 
+  /**
+   * Add a second line to the List Rendering
+   * @param secondLine
+   */
   secondLine(secondLine: (model: TModel) => string) {
     this.config.listConfig!.secondLine = secondLine;
     return this;
   }
 
+  /**
+   * Add an image to the List Rendering
+   * @param avatar - The url mapping
+   * @param cacheBuster - An optional cache buster for the image
+   */
   avatar(avatar: (model: TModel) => string|undefined, cacheBuster?: (data: TModel) => string|Date|undefined) {
     this.config.listConfig!.avatar = avatar;
     this.config.listConfig!.avatarCacheBuster = cacheBuster;
     return this;
   }
 
+  /**
+   * Define a placeholder for the list image if it can't be found
+   * @param avatarPlaceholder - Fallback URL
+   */
   avatarPlaceholder(avatarPlaceholder: string) {
     this.config.listConfig!.avatarPlaceholder = avatarPlaceholder;
     return this;
   }
 
+  /**
+   * Add an icon to the List Rendering
+   * @param icon
+   */
   icon(icon: (model: TModel) => string) {
     this.config.listConfig!.icon = icon;
     return this;
   }
 
+  /**
+   * Add custom styling to the List Rendering
+   * @param cssClass - The CSS class to apply
+   * @param condition - The condition for applying the style
+   */
   style(cssClass: 'faded'|string, condition: (model: TModel) => boolean) {
     this.config.listConfig!.styles.push({cssClass, condition});
     return this;
   }
 
+  /**
+   * Finish setting up List Rendering
+   */
   finishList() {
     return this.config;
   }
 
+  /**
+   * Finish setting up the data source
+   */
   finish() {
     return this.config.finish();
   }
@@ -269,31 +432,54 @@ class GridConfig<TModel extends WithId> {
   constructor(private config: ListDataSourceConfig<TModel>) {
   }
 
+  /**
+   * Add a sub-title to the Grid Rendering
+   * @param subTitle
+   */
   subTitle(subTitle: (model: TModel) => string) {
     this.config.gridConfig!.subTitle = subTitle;
     return this;
   }
 
+  /**
+   * Add an image to the Grid Rendering
+   * @param image - The url mapping
+   * @param cacheBuster - An optional cache buster for the image
+   */
   image(image: (model: TModel) => string | undefined, cacheBuster?: (data: TModel) => string|Date|undefined) {
     this.config.gridConfig!.image = image;
     this.config.gridConfig!.imageCacheBuster = cacheBuster;
     return this;
   }
 
+  /**
+   * Define a placeholder for the grid image if it can't be found
+   * @param placeholder - Fallback URL
+   */
   imagePlaceholder(placeholder: string) {
     this.config.gridConfig!.imagePlaceholder = placeholder;
     return this;
   }
 
+  /**
+   * Add an icon to the Grid Rendering
+   * @param icon
+   */
   icon(icon: (model: TModel) => string | undefined) {
     this.config.gridConfig!.icon = icon;
     return this;
   }
 
+  /**
+   * Finish setting up Grid Rendering
+   */
   finishGrid() {
     return this.config;
   }
 
+  /**
+   * Finish setting up the data source
+   */
   finish() {
     return this.config.finish();
   }

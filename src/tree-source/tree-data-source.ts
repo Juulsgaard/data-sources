@@ -2,17 +2,25 @@ import {asyncScheduler, auditTime, BehaviorSubject, combineLatest, merge, Observ
 import {catchError, distinctUntilChanged, map, switchMap, tap, throttleTime} from "rxjs/operators";
 import Fuse from "fuse.js";
 import {
-  BaseTreeFolder, BaseTreeItem, TreeAsideData, TreeAsideFolderData, TreeAsideItemData, TreeDataSourceOptions, TreeFolder, TreeFolderData,
-  TreeFolderSearchData, TreeFolderSearchRowData, TreeHiddenSearchColumnConfig, TreeHiddenSortColumnConfig, TreeItem, TreeItemData, TreeItemSearchData,
-  TreeItemSearchRowData, TreeRowConfig, TreeSearchColumnConfig, TreeSearchConfig, TreeSearchData, TreeSearchRowData, TreeSortConfig
+  BaseTreeFolder, BaseTreeItem, TreeAsideData, TreeAsideFolderData, TreeAsideItemData, TreeDataSourceOptions,
+  TreeFolder, TreeFolderAction, TreeFolderActionConfig, TreeFolderData,
+  TreeFolderSearchData, TreeFolderSearchRowData, TreeHiddenSearchColumnConfig, TreeHiddenSortColumnConfig, TreeItem,
+  TreeItemAction,
+  TreeItemActionConfig,
+  TreeItemData, TreeItemSearchData,
+  TreeItemSearchRowData, TreeRowConfig, TreeSearchColumnConfig, TreeSearchConfig, TreeSearchData, TreeSearchRowData,
+  TreeSortConfig
 } from "./tree-data";
 import {TreeFolderFilterState, TreeItemFilterState} from "../filtering/filter-service";
 import {BulkRelocateModel, MoveModel} from "../models/move";
 import {cache} from "../lib/rxjs";
 import {TreeDataOptionConfig} from "./tree-source-config";
 import {DetachedSearchData} from "../models/detached-search";
-import {applySelector, arrToLookup, arrToMap, mapToArr, Selection, SimpleObject, SortFn, titleCase, WithId} from "@consensus-labs/ts-tools";
+import {
+  applySelector, arrToLookup, arrToMap, mapArr, mapToArr, Selection, SimpleObject, SortFn, titleCase, WithId
+} from "@consensus-labs/ts-tools";
 import {Sort} from "../lib/types";
+import {ListAction} from "../list-source/list-data";
 
 export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
 
@@ -617,6 +625,42 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
 
   //</editor-fold>
 
+  //<editor-fold desc="Action Mapping">
+
+  private mapFolderActions(folder: TreeFolder<TFolder, TItem>): TreeFolderAction<TFolder, TItem>[] {
+    return mapArr(
+      this.options.folderActions,
+      (config): TreeFolderAction<TFolder, TItem>|undefined => {
+        if (!config.action && !config.route) return undefined;
+        if (config.filter && !config.filter(folder.model, folder)) return undefined;
+
+        if (config.route === undefined) {
+          return config as TreeFolderAction<TFolder, TItem>;
+        }
+
+        return {name: config.name, icon: config.icon, color: config.color, route: config.route(folder.model, folder)};
+      }
+    );
+  }
+
+  private mapItemActions(folder: TreeItem<TFolder, TItem>): TreeItemAction<TFolder, TItem>[] {
+    return mapArr(
+      this.options.itemActions,
+      (config): TreeItemAction<TFolder, TItem>|undefined => {
+        if (!config.action && !config.route) return undefined;
+        if (config.filter && !config.filter(folder.model, folder)) return undefined;
+
+        if (config.route === undefined) {
+          return config as TreeItemAction<TFolder, TItem>;
+        }
+
+        return {name: config.name, icon: config.icon, color: config.color, route: config.route(folder.model, folder)};
+      }
+    );
+  }
+
+  //</editor-fold>
+
   //<editor-fold desc="Sidebar Data">
 
   public getSidebarData(folderId$: Observable<string|undefined>): Observable<TreeAsideData<TFolder, TItem>> {
@@ -636,7 +680,6 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
 
     const folders = folder.folders.map(x => this.mapSidebarFolder(x));
     const items = folder.items.map(x => this.mapSidebarItem(x));
-    const actions = this.options.folderActions.filter(x => !x.filter || x.filter(folder.model, folder));
     const path = folder.path.map(x => ({name: this.treeConfig?.folderName(x.model, x) ?? '--', model: x}));
 
     return {
@@ -646,7 +689,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
       bonus: this.treeConfig?.folderBonus?.(folder.model, folder),
       folders,
       items,
-      actions,
+      actions: this.mapFolderActions(folder),
       path
     }
   }
@@ -669,28 +712,22 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
   }
 
   private mapSidebarFolder(folder: TreeFolder<TFolder, TItem>): TreeAsideFolderData<TFolder, TItem> {
-
-    const actions = this.options.folderActions.filter(x => !x.filter || x.filter(folder.model, folder));
-
     return {
       model: folder,
       name: this.treeConfig?.folderName(folder.model, folder) ?? 'N/A',
       bonus: this.treeConfig?.folderBonus?.(folder.model, folder),
       icon: this.getFolderIcon(folder),
-      actions
+      actions: this.mapFolderActions(folder)
     };
   }
 
   private mapSidebarItem(item: TreeItem<TFolder, TItem>): TreeAsideItemData<TFolder, TItem> {
-
-    const actions = this.options.itemActions.filter(x => !x.filter || x.filter(item.model, item));
-
     return {
       model: item,
       name: this.treeConfig?.itemName(item.model, item) ?? 'N/A',
       bonus: this.treeConfig?.itemBonus?.(item.model, item),
       icon: this.getItemIcon(item),
-      actions
+      actions: this.mapItemActions(item)
     };
   }
 
@@ -726,13 +763,12 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
 
     const folders = folder.folders.map(x => this.mapTreeFolder(x));
     const items = folder.items.map(x => this.mapTreeItem(x));
-    const actions = this.options.folderActions.filter(x => !x.filter || x.filter(folder.model, folder));
 
     return {
       model: folder,
       items,
       folders,
-      actions,
+      actions: this.mapFolderActions(folder),
       data: {
         name: this.treeConfig!.folderName(folder.model, folder),
         icon: this.getFolderIcon(folder),
@@ -749,12 +785,9 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
    * @private
    */
   private mapTreeItem(item: TreeItem<TFolder, TItem>): TreeItemData<TFolder, TItem> {
-
-    const actions = this.options.itemActions.filter(x => !x.filter || x.filter(item.model, item));
-
     return {
       model: item,
-      actions,
+      actions: this.mapItemActions(item),
       data: {
         icon: this.getItemIcon(item),
         name: this.treeConfig!.itemName(item.model, item),
@@ -824,13 +857,13 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
       if (row.isFolder) {
         return {
           ...row, data,
-          actions: this.options.folderActions.filter(x => !x.filter || x.filter(row.model.model, row.model))
+          actions: this.mapFolderActions(row.model)
         };
       }
 
       return {
         ...row, data,
-        actions: this.options.itemActions.filter(x => !x.filter || x.filter(row.model.model, row.model))
+        actions: this.mapItemActions(row.model)
       };
     });
 

@@ -2,9 +2,14 @@ import {asyncScheduler, BehaviorSubject, combineLatest, merge, Observable, of, R
 import {catchError, distinctUntilChanged, map, switchMap, tap, throttleTime} from "rxjs/operators";
 import Fuse from "fuse.js";
 import {FilterServiceState} from "../filtering/filter-service";
-import {GridData, GridDataConfig, ListData, ListDataConfig, ListDataSourceOptions, ListSearchData, ListUniversalData} from "./list-data";
-import {ListDataSourceConfig} from "./list-source-config";
-import {HiddenSearchColumn, HiddenSortColumn, TableColumn, TableData} from "./table-data";
+import {
+  GridData, GridDataConfig, HiddenSearchColumn, HiddenSortColumn, ListAction, ListActionConfig, ListData,
+  ListDataConfig,
+  ListDataSourceOptions, ListFlag,
+  ListSearchData,
+  ListUniversalData, TableColumn, TableData
+} from "./list-data";
+import {IListDataSourceConfig, ListDataSourceConfig} from "./list-source-config";
 import {cache} from "../lib/rxjs";
 import {ISorted, sortByIndexAsc} from "../lib/index-sort";
 import {DetachedSearchData} from "../models/detached-search";
@@ -14,7 +19,7 @@ import {Page, Sort} from "../lib/types";
 
 export class ListDataSource<TModel extends WithId> {
 
-  public static build<TModel extends WithId>() {
+  public static build<TModel extends WithId>(): IListDataSourceConfig<TModel> {
     return new ListDataSourceConfig<TModel>();
   }
 
@@ -315,14 +320,18 @@ export class ListDataSource<TModel extends WithId> {
 
   //<editor-fold desc="Map To Universal">
   mapToUniversal(list: TModel[]): ListUniversalData<TModel>[] {
-    return list.map(row => {
-      const actions = this.options.actions.filter(x => !x.filter || x.filter(row));
+    return list.map((row): ListUniversalData<TModel> => {
+
+      const actions = mapArr(this.options.actions, action => this.mapAction(row, action));
+
       const flags = mapArr(this.options.flags, f => {
-        const icon = f.filter(row) ? f.icon : f.inactiveIcon;
-        return icon ? {icon, name: f.name} : null;
+        const active = f.filter(row);
+        const icon = active ? f.icon : f.inactiveIcon;
+        const name = active ? f.name : f.inactiveName ?? f.name;
+        return icon ? {icon, name} as ListFlag : null;
       });
 
-      return {model: row, actions, flags} as ListUniversalData<TModel>;
+      return {model: row, actions, flags};
     });
   }
   //</editor-fold>
@@ -341,7 +350,11 @@ export class ListDataSource<TModel extends WithId> {
         data[col.id] = col.mapData(row.model);
       });
 
-      return {...row, id: row.model.id, data};
+      return {
+        ...row,
+        id: row.model.id,
+        data
+      };
     });
   }
 
@@ -569,6 +582,22 @@ export class ListDataSource<TModel extends WithId> {
     if (!cacheBuster) return url;
     const cbStr = cacheBuster instanceof Date ? (cacheBuster.getTime() / 1000).toFixed(0) : cacheBuster;
     return applyQueryParam(url, '_cb', cbStr);
+  }
+
+  /**
+   * Maps an action config to undefined if invalid, or to an action if valid
+   * @param data - The row data
+   * @param config - The action config
+   */
+  private mapAction(data: TModel, config: ListActionConfig<TModel>): ListAction<TModel>|undefined {
+    if (!config.action && !config.route) return undefined;
+    if (config.filter && !config.filter(data)) return undefined;
+
+    if (config.route === undefined) {
+      return config as ListAction<TModel>;
+    }
+
+    return {name: config.name, icon: config.icon, color: config.color, route: config.route(data)};
   }
   //</editor-fold>
 

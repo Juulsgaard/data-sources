@@ -1,9 +1,49 @@
-//<editor-fold desc="List Data">
 import {FilterService} from "../filtering/filter-service";
-import {ListFlagData} from "./table-data";
-import {SimpleObject} from "@consensus-labs/ts-tools";
 import {ThemeColor} from "../lib/types";
+import {SortFn} from "@consensus-labs/ts-tools";
+import {RenderDataType} from "../models/render-types";
 
+//<editor-fold desc="Column Data">
+
+export interface TableColumn<TItem, TData> {
+    id: string;
+    title: string;
+    mapData: (data: TItem) => TData;
+    dataType: RenderDataType<TData>;
+    sortFn?: SortFn<TItem>;
+    defaultSort: boolean;
+    searchable: boolean;
+    searchWeight?: number;
+}
+
+export interface TableColumnOptions<TModel, TData> {
+    /** Sort the column with a default algorithm based on the data type */
+    typeSort?: boolean;
+    /** Define a custom sorting method for the column */
+    customSort?: (a: TModel, b: TModel) => number;
+    /** Mark this column as the default used for sorting */
+    defaultSort?: boolean;
+    /** Include this column in the search index */
+    searchable?: boolean;
+    /** Add a custom weighting to this column in the search index */
+    searchWeight?: number;
+}
+
+export interface HiddenSearchColumn<TModel> {
+    id: string;
+    mapData: (model: TModel) => string|undefined;
+    weight?: number;
+}
+
+export interface HiddenSortColumn<TModel, TData> {
+    id: string;
+    title: string;
+    sortFn: SortFn<TModel>;
+    defaultSort: boolean;
+}
+//</editor-fold>
+
+//<editor-fold desc="List Data">
 /**
  * The data structure used to render lists
  */
@@ -14,8 +54,8 @@ export interface ListData<TModel> {
     secondLine?: string;
     avatar?: string;
     icon?: string;
-    actions: ListActionConfig<TModel>[];
-    flags: ListFlagData[];
+    actions: ListAction<TModel>[];
+    flags: ListFlag[];
     cssClasses: string[];
 }
 
@@ -33,6 +73,16 @@ export interface ListDataConfig<TItem> {
 }
 //</editor-fold>
 
+//<editor-fold desc="Table Data">
+export interface TableData<TModel> {
+    id: string;
+    model: TModel;
+    data: Record<string, any|undefined>;
+    actions: ListAction<TModel>[];
+    flags: ListFlag[];
+}
+//</editor-fold>
+
 //<editor-fold desc="Grid Data">
 /**
  * A data structure used to render list grids
@@ -45,8 +95,8 @@ export interface GridData<TModel> {
     image?: string;
     icon?: string;
     index?: number;
-    actions: ListActionConfig<TModel>[];
-    flags: ListFlagData[];
+    actions: ListAction<TModel>[];
+    flags: ListFlag[];
 }
 
 /**
@@ -71,6 +121,12 @@ export interface ListFlagConfig<TItem> {
     name: string;
     filter: (data: TItem) => boolean
     inactiveIcon?: string;
+    inactiveName?: string;
+}
+
+export interface ListFlag {
+    icon: string;
+    name: string;
 }
 //</editor-fold>
 
@@ -81,14 +137,25 @@ export interface ListFlagConfig<TItem> {
 export interface ListActionConfig<TModel> extends ListActionOptions<TModel> {
     name: string;
     icon: string;
-    action: (data: TModel) => any;
+    action?: (data: TModel) => any;
+    route?: (data: TModel) => string[];
+}
+
+export interface ListAction<TModel> {
+    name: string;
+    icon: string;
+    color?: ThemeColor;
+    action?: (data: TModel) => any;
+    route?: string[];
 }
 
 /**
  * Optional configs for ListActionConfig
  */
 export interface ListActionOptions<TModel> {
+    /** A filter to determine when the action should be visible */
     filter?: (data: TModel) => boolean;
+    /** An optional color for the button */
     color?: ThemeColor;
 }
 //</editor-fold>
@@ -108,8 +175,8 @@ export interface ListDataSourceOptions<TModel> {
 
 export interface ListUniversalData<TModel> {
     model: TModel;
-    flags: ListFlagConfig<TModel>[];
-    actions: ListActionConfig<TModel>[];
+    flags: ListFlag[];
+    actions: ListAction<TModel>[];
 }
 
 export interface ListSearchData<TModel> {

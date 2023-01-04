@@ -1,13 +1,16 @@
 import {
-  TreeDataSourceOptions, TreeFolderActionOptions, TreeFolderMap, TreeFolderMeta, TreeHiddenSearchColumnConfig, TreeHiddenSortColumnConfig,
-  TreeItemActionOptions, TreeItemMap, TreeMoveActions, TreeRowConfig, TreeSearchColumnConfig, TreeSortConfig
+  TreeDataSourceOptions, TreeFolderActionOptions, TreeFolderMap, TreeHiddenSearchColumnConfig,
+  TreeHiddenSortColumnConfig, TreeItemActionOptions, TreeItemMap, TreeMoveActions, TreeRowConfig,
+  TreeSearchColumnConfig, TreeSortConfig
 } from "./tree-data";
 import {RenderDataPrimaryTypes, RenderDataType, RenderDataTypeLookup, RenderDataTypes} from "../models/render-types";
 import {getRenderDataTypeSorting} from "../lib/sorting";
 import {TreeDataSource} from "./tree-data-source";
 import {TreeFolderFilterService, TreeItemFilterService} from "../filtering/filter-service";
 import {ISorted, sortByIndexAsc} from "../lib/index-sort";
-import {arrToObj, Conditional, getSelectorFn, KeysOfType, lowerFirst, Selection, WithId} from "@consensus-labs/ts-tools";
+import {
+  arrToObj, Conditional, getSelectorFn, KeysOfType, KeysOfTypeOrNull, lowerFirst, Selection, WithId
+} from "@consensus-labs/ts-tools";
 
 //<editor-fold desc="Option Builder">
 export class TreeDataOptionConfig<TFolder extends WithId, TItem extends WithId> {
@@ -24,42 +27,76 @@ export class TreeDataOptionConfig<TFolder extends WithId, TItem extends WithId> 
     };
   }
 
+  /**
+   * Define a parent property on the folder type
+   * This will allow for an infinitely nested tree structure
+   * @param parentId - The parentId prop
+   */
   withFolderParent(parentId: Selection<TFolder, string | undefined>) {
     this.options.folderParentId = parentId;
     return this;
   }
 
+  /**
+   * Indicate that the folders should be sorted using an index property
+   */
   withSortedFolders(): Conditional<TFolder, ISorted, TreeDataOptionConfig<TFolder, TItem>> {
     this.options.folderSort = sortByIndexAsc as unknown as (a: TFolder, b: TFolder) => number;
     return this as any;
   }
 
+  /**
+   * Add sorting to the folders in tree view
+   * @param sort
+   */
   withFolderSort(sort: (a: TFolder, b: TFolder) => number) {
     this.options.folderSort = sort;
     return this;
   }
 
+  /**
+   * Indicate that the items should be sorted using an index property
+   */
   withSortedItems(): Conditional<TItem, ISorted, TreeDataOptionConfig<TFolder, TItem>> {
     this.options.itemSort = sortByIndexAsc as unknown as (a: TItem, b: TItem) => number;
     return this as any;
   }
 
+  /**
+   * Add sorting to the items in tree view
+   * @param sort
+   */
   withItemSort(sort: (a: TItem, b: TItem) => number) {
     this.options.itemSort = sort;
     return this;
   }
 
+  /**
+   * Add a filter service for the folders
+   * @param service - The filter service
+   */
   withFolderFilter(service: TreeFolderFilterService<any, TFolder>) {
     this.options.folderFilterService = service;
     return this;
   }
 
+  /**
+   * Add a filter service for the items
+   * @param service - The filter service
+   */
   withItemFilter(service: TreeItemFilterService<any, TItem>) {
     this.options.itemFilterService = service;
     return this;
   }
 
-  addFolderAction(name: string, icon: string, action: (data: TFolder, meta: TreeFolderMeta<TFolder, TItem>) => any, options?: TreeFolderActionOptions<TFolder, TItem>) {
+  /**
+   * Add an action that can be performed on a folder
+   * @param name - The display name of the Action
+   * @param icon - The icon for the Action
+   * @param action - The action to be performed
+   * @param options - Options to configure the action
+   */
+  addFolderAction(name: string, icon: string, action: TreeFolderMap<TFolder, TItem, any>, options?: TreeFolderActionOptions<TFolder, TItem>) {
     this.options.folderActions.push({
       name,
       icon,
@@ -69,6 +106,30 @@ export class TreeDataOptionConfig<TFolder extends WithId, TItem extends WithId> 
     return this;
   }
 
+  /**
+   * Add a navigation action that can be performed on a folder
+   * @param name - The display name of the Action
+   * @param icon - The icon for the Action
+   * @param route - A generator for the route to use for navigation
+   * @param options - Options to configure the action
+   */
+  addFolderNavigation(name: string, icon: string, route: TreeFolderMap<TFolder, TItem, string[]>, options?: TreeFolderActionOptions<TFolder, TItem>) {
+    this.options.folderActions.push({
+      name,
+      icon,
+      route,
+      ...options
+    });
+    return this;
+  }
+
+  /**
+   * Add an action that can be performed on an item
+   * @param name - The display name of the Action
+   * @param icon - The icon for the Action
+   * @param action - The action to be performed
+   * @param options - Options to configure the action
+   */
   addItemAction(name: string, icon: string, action: TreeItemMap<TFolder, TItem, any>, options?: TreeItemActionOptions<TFolder, TItem>) {
     this.options.itemActions.push({
       name,
@@ -79,11 +140,35 @@ export class TreeDataOptionConfig<TFolder extends WithId, TItem extends WithId> 
     return this;
   }
 
+  /**
+   * Add a navigation action that can be performed on a folder
+   * @param name - The display name of the Action
+   * @param icon - The icon for the Action
+   * @param route - A generator for the route to use for navigation
+   * @param options - Options to configure the action
+   */
+  addItemNavigation(name: string, icon: string, route: TreeItemMap<TFolder, TItem, string[]>, options?: TreeItemActionOptions<TFolder, TItem>) {
+    this.options.itemActions.push({
+      name,
+      icon,
+      route,
+      ...options
+    });
+    return this;
+  }
+
+  /**
+   * Define actions for moving and relocating items
+   * @param actions
+   */
   addMoveActions(actions: TreeMoveActions) {
     this.options.moveActions = actions;
     return this;
   }
 
+  /**
+   * Add Tree Rendering to this config
+   */
   asTree() {
     return {
       folderRow: (
@@ -104,7 +189,7 @@ export class TreeDataOptionConfig<TFolder extends WithId, TItem extends WithId> 
             getIcon?: TreeItemMap<TFolder, TItem, string|undefined>|null,
             getBonus?: TreeItemMap<TFolder, TItem, string|undefined>|null,
             getTooltip?: TreeItemMap<TFolder, TItem, string|undefined>|null,
-          ) =>
+          ): ITreeDataSourceConfig<TFolder, TItem> =>
             new TreeDataSourceConfig(this.options, {
               ...folderConfig,
               itemName: getName,
@@ -117,7 +202,11 @@ export class TreeDataOptionConfig<TFolder extends WithId, TItem extends WithId> 
     };
   }
 
-  asSearchOnly() {
+  /**
+   * Don't add Tree Rendering
+   * This will make it so that this config can only be used for searching
+   */
+  asSearchOnly(): ITreeDataSourceConfig<TFolder, TItem> {
     return new TreeDataSourceConfig<TFolder, TItem>(this.options);
   }
 }
@@ -125,6 +214,8 @@ export class TreeDataOptionConfig<TFolder extends WithId, TItem extends WithId> 
 //</editor-fold>
 
 //<editor-fold desc="Table Builder">
+
+//<editor-fold desc="Types">
 type SearchColumnConfigs<TFolder extends WithId, TItem extends WithId> = {
   [key in keyof typeof RenderDataTypes as Uncapitalize<key>]: SearchColumnConfig<TFolder, TItem, RenderDataTypeLookup<typeof RenderDataTypes[key]>|undefined>
 };
@@ -132,23 +223,51 @@ type SearchColumnItemConfigs<TFolder extends WithId, TItem extends WithId, TData
   [key in keyof typeof RenderDataTypes as Uncapitalize<key>]: SearchColumnItemConfig<TFolder, TData, TItem, RenderDataTypeLookup<typeof RenderDataTypes[key]>|undefined>
 };
 
-class TreeDataSourceConfig<TFolder extends WithId, TItem extends WithId> {
+type ColumnCreator<TFolder extends WithId, TItem extends WithId> = {
+  /** Define a column including the folders */
+  folder: SearchColumnConfigs<TFolder, TItem>,
+  /** Define a column that does not include folders */
+  noFolder: (id: string, title?: string) => SearchColumnMidConfig<TFolder, TItem, undefined>,
+  /** Create a column that displays the path */
+  path: (getName: TreeFolderMap<TFolder, TItem, string>) => ITreeDataSourceConfig<TFolder, TItem>,
+};
+
+type SearchColumnCreator<TFolder extends WithId, TItem extends WithId> = {
+  /** Add a search column for folders */
+  folder(id: string, map: TreeFolderMap<TFolder, TItem, string|undefined>, weight?: number): ITreeDataSourceConfig<TFolder, TItem>;
+  /** Add a search column for items */
+  item(id: string, map: TreeItemMap<TFolder, TItem, string|undefined>, weight?: number): ITreeDataSourceConfig<TFolder, TItem>;
+};
+
+interface ITreeDataSourceConfig<TFolder extends WithId, TItem extends WithId> {
+
+  /**
+   * Add a column
+   * These columns will be rendered
+   */
+  column: ColumnCreator<TFolder, TItem>;
+
+  /**
+   * Add a hidden search column
+   * These columns are only used for searching and won't be rendered
+   */
+  search: SearchColumnCreator<TFolder, TItem>;
+
+  /** Finish building the Data Source */
+  finish(): TreeDataSource<TFolder, TItem>;
+}
+//</editor-fold>
+
+class TreeDataSourceConfig<TFolder extends WithId, TItem extends WithId> implements ITreeDataSourceConfig<TFolder, TItem> {
+
   public readonly searchColumns: TreeSearchColumnConfig<TFolder, unknown, TItem, unknown>[] = [];
   public readonly hiddenSearchColumns: TreeHiddenSearchColumnConfig<TFolder, TItem>[] = [];
 
   // TODO: Add config builder for sort columns
   public readonly hiddenSortColumns: TreeHiddenSortColumnConfig<TFolder, TItem, unknown>[] = [];
 
-  column: {
-    folder: SearchColumnConfigs<TFolder, TItem>,
-    noFolder: (id: string, title?: string) => SearchColumnMidConfig<TFolder, TItem, undefined>,
-    path: (getName: TreeFolderMap<TFolder, TItem, string>) => TreeDataSourceConfig<TFolder, TItem>,
-  };
-
-  search: {
-    folder(id: string, map: TreeFolderMap<TFolder, TItem, string|undefined>, weight?: number): TreeDataSourceConfig<TFolder, TItem>;
-    item(id: string, map: TreeItemMap<TFolder, TItem, string|undefined>, weight?: number): TreeDataSourceConfig<TFolder, TItem>;
-  }
+  column: ColumnCreator<TFolder, TItem>;
+  search: SearchColumnCreator<TFolder, TItem>;
 
   constructor(
     public options: TreeDataSourceOptions<TFolder, TItem>,
@@ -201,7 +320,12 @@ class SearchColumnConfig<TFolder extends WithId, TItem extends WithId, TData ext
   constructor(private type: RenderDataType<TData>, private rootConfig: TreeDataSourceConfig<TFolder, TItem>) {
   }
 
-  prop(key: KeysOfType<TFolder, TData> & string, title?: string) {
+  /**
+   * Use an existing property as a column
+   * @param key - The property to use
+   * @param title - The name of the column
+   */
+  prop(key: KeysOfTypeOrNull<TFolder, TData> & string, title?: string) {
     return this.continue({
       id: key,
       title,
@@ -212,6 +336,12 @@ class SearchColumnConfig<TFolder extends WithId, TItem extends WithId, TData ext
     });
   }
 
+  /**
+   * Create a new column using a custom mapping
+   * @param id - The ID of the column
+   * @param title - The name of the column
+   * @param map - The data mapping for the column
+   */
   add(id: string, title: string, map: TreeFolderMap<TFolder, TItem, TData>) {
     return this.continue({
       id,
@@ -230,6 +360,7 @@ class SearchColumnConfig<TFolder extends WithId, TItem extends WithId, TData ext
 
 class SearchColumnMidConfig<TFolder extends WithId, TItem extends WithId, TData extends RenderDataPrimaryTypes> {
 
+  /** Include items in the column */
   item: SearchColumnItemConfigs<TFolder, TItem, TData>;
 
   constructor(
@@ -244,6 +375,7 @@ class SearchColumnMidConfig<TFolder extends WithId, TItem extends WithId, TData 
     ) as SearchColumnItemConfigs<TFolder, TItem, TData>;
   }
 
+  /** Don't include items in the column */
   noItem() {
     return new SearchColumnFinalConfig<TFolder, TData, TItem, undefined>(
       {
@@ -265,6 +397,10 @@ class SearchColumnItemConfig<TFolder extends WithId, TFolderData extends RenderD
   ) {
   }
 
+  /**
+   * Use an existing property for the item data
+   * @param key - The property to use
+   */
   prop(key: KeysOfType<TItem, TItemData>) {
     return new SearchColumnFinalConfig<TFolder, TFolderData, TItem, TItemData>(
       {
@@ -275,6 +411,10 @@ class SearchColumnItemConfig<TFolder extends WithId, TFolderData extends RenderD
     );
   }
 
+  /**
+   * Generate item data for the columns using a custom mapping
+   * @param map - The data mapping for the column
+   */
   map(map: TreeItemMap<TFolder, TItem, TItemData>) {
     return new SearchColumnFinalConfig<TFolder, TFolderData, TItem, TItemData>(
       {
@@ -297,6 +437,12 @@ class SearchColumnFinalConfig<TFolder extends WithId, TFolderData extends Render
   ) {
   }
 
+  /**
+   * Add sorting capabilities to the column
+   * @param mapFolder - Map folder data for the sorting
+   * @param mapItem - Map the item data for the sorting
+   * @param type - The data type for the sorting
+   */
   withSorting<TSort>(
     mapFolder: TreeFolderMap<TFolder, TItem, TSort>,
     mapItem: TreeItemMap<TFolder, TItem, TSort>,
@@ -310,6 +456,10 @@ class SearchColumnFinalConfig<TFolder extends WithId, TFolderData extends Render
     return this;
   }
 
+  /**
+   * Use this column for searching
+   * @param weight - Set a custom weight for the search
+   */
   includeInSearch(weight?: number) {
     this.config.searching = {
       mapFolder: (folder, meta) => this.config.folder.mapData(folder, meta)?.toString(),
@@ -319,7 +469,10 @@ class SearchColumnFinalConfig<TFolder extends WithId, TFolderData extends Render
     return this;
   }
 
-  done() {
+  /**
+   * Finish defining the column
+   */
+  done(): ITreeDataSourceConfig<TFolder, TItem> {
     this.rootConfig.searchColumns.push(this.config);
     return this.rootConfig;
   }

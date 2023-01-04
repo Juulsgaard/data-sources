@@ -11,10 +11,10 @@ import {ThemeColor} from "../lib/types";
  */
 export interface TreeFolderData<TFolder, TItem> {
   model: TreeFolder<TFolder, TItem>
-  items: TreeItemData<TFolder, TItem>[];
   folders: TreeFolderData<TFolder, TItem>[];
+  items: TreeItemData<TFolder, TItem>[];
   data: TreeRowData;
-  actions: TreeFolderActionConfig<TFolder, TItem>[];
+  actions: TreeFolderAction<TFolder, TItem>[];
 }
 
 /**
@@ -23,7 +23,7 @@ export interface TreeFolderData<TFolder, TItem> {
 export interface TreeItemData<TFolder, TItem> {
   model: TreeItem<TFolder, TItem>;
   data: TreeRowData;
-  actions: TreeItemActionConfig<TFolder, TItem>[];
+  actions: TreeItemAction<TFolder, TItem>[];
 }
 
 /**
@@ -59,14 +59,14 @@ export interface TreeFolderSearchRowData<TFolder, TItem> {
   data: Record<string, any|undefined>;
   isFolder: true;
   model: TreeFolder<TFolder, TItem>;
-  actions: TreeFolderActionConfig<TFolder, TItem>[];
+  actions: TreeFolderAction<TFolder, TItem>[];
 }
 
 export interface TreeItemSearchRowData<TFolder, TItem> {
   data: Record<string, any|undefined>;
   isFolder: false;
   model: TreeItem<TFolder, TItem>;
-  actions: TreeItemActionConfig<TFolder, TItem>[];
+  actions: TreeItemAction<TFolder, TItem>[];
 }
 
 export type TreeSearchRowData<TFolder, TItem> = TreeFolderSearchRowData<TFolder, TItem> | TreeItemSearchRowData<TFolder, TItem>;
@@ -258,7 +258,7 @@ export interface TreeAsideData<TFolder, TItem> {
   icon: string;
   path: TreePathData<TFolder, TItem>[];
 
-  actions: TreeFolderActionConfig<TFolder, TItem>[];
+  actions: TreeFolderAction<TFolder, TItem>[];
 
   folders: TreeAsideFolderData<TFolder, TItem>[];
   items: TreeAsideItemData<TFolder, TItem>[];
@@ -272,7 +272,7 @@ export interface TreeAsideFolderData<TFolder, TItem> {
   icon?: string;
   bonus?: string;
   model: TreeFolder<TFolder, TItem>;
-  actions: TreeFolderActionConfig<TFolder, TItem>[];
+  actions: TreeFolderAction<TFolder, TItem>[];
 }
 
 /**
@@ -283,7 +283,7 @@ export interface TreeAsideItemData<TFolder, TItem> {
   icon?: string;
   bonus?: string;
   model: TreeItem<TFolder, TItem>;
-  actions: TreeItemActionConfig<TFolder, TItem>[];
+  actions: TreeItemAction<TFolder, TItem>[];
 }
 
 /**
@@ -303,14 +303,25 @@ export interface TreePathData<TFolder, TItem> {
 export interface TreeFolderActionConfig<TFolder, TItem> extends TreeFolderActionOptions<TFolder, TItem> {
   name: string;
   icon: string;
-  action: (data: TFolder, meta: TreeFolderMeta<TFolder, TItem>) => any;
+  action?: TreeFolderMap<TFolder, TItem, any>;
+  route?: TreeFolderMap<TFolder, TItem, string[]>;
+}
+
+export interface TreeFolderAction<TFolder, TItem> {
+  name: string;
+  icon: string;
+  action?: TreeFolderMap<TFolder, TItem, any>;
+  route?: string[];
+  color?: ThemeColor;
 }
 
 /**
  * Optional config for TreeFolderActionConfig
  */
 export interface TreeFolderActionOptions<TFolder, TItem> {
-  filter?: (data: TFolder, meta: TreeFolderMeta<TFolder, TItem>) => boolean;
+  /** A filter to determine when the action should be visible */
+  filter?: TreeFolderMap<TFolder, TItem, boolean>;
+  /** An optional color for the button */
   color?: ThemeColor;
 }
 
@@ -320,14 +331,25 @@ export interface TreeFolderActionOptions<TFolder, TItem> {
 export interface TreeItemActionConfig<TFolder, TItem> extends TreeItemActionOptions<TFolder, TItem> {
   name: string;
   icon: string;
-  action: TreeItemMap<TFolder, TItem, any>;
+  action?: TreeItemMap<TFolder, TItem, any>;
+  route?: TreeItemMap<TFolder, TItem, string[]>;
+}
+
+export interface TreeItemAction<TFolder, TItem> {
+  name: string;
+  icon: string;
+  action?: TreeItemMap<TFolder, TItem, any>;
+  route?: string[];
+  color?: ThemeColor;
 }
 
 /**
  * Optional config for TreeItemActionConfig
  */
 export interface TreeItemActionOptions<TFolder, TItem> {
+  /** A filter to determine when the action should be visible */
   filter?: TreeItemMap<TFolder, TItem, boolean>;
+  /** An optional color for the button */
   color?: ThemeColor;
 }
 
