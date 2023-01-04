@@ -412,7 +412,7 @@ class ListConfig<TModel extends WithId> {
   /**
    * Finish setting up List Rendering
    */
-  finishList() {
+  finishList(): IListDataSourceConfig<TModel> {
     return this.config;
   }
 
@@ -473,7 +473,7 @@ class GridConfig<TModel extends WithId> {
   /**
    * Finish setting up Grid Rendering
    */
-  finishGrid() {
+  finishGrid(): IListDataSourceConfig<TModel> {
     return this.config;
   }
 
