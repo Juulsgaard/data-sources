@@ -326,7 +326,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
 
     // Search Query
     const searchQuery$ = this.searchQuery$.pipe(
-      throttleTime(700, asyncScheduler, {leading: true, trailing: true}),
+      throttleTime(800, asyncScheduler, {leading: false, trailing: true}),
       cache()
     );
 
