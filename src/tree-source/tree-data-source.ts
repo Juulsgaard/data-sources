@@ -1,4 +1,6 @@
-import {asyncScheduler, auditTime, BehaviorSubject, combineLatest, merge, Observable, of, ReplaySubject} from "rxjs";
+import {
+  asyncScheduler, auditTime, BehaviorSubject, combineLatest, merge, Observable, of, ReplaySubject, startWith
+} from "rxjs";
 import {catchError, distinctUntilChanged, map, switchMap, tap, throttleTime} from "rxjs/operators";
 import Fuse from "fuse.js";
 import {
@@ -327,6 +329,8 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
     // Search Query
     const searchQuery$ = this.searchQuery$.pipe(
       throttleTime(800, asyncScheduler, {leading: false, trailing: true}),
+      startWith(undefined),
+      distinctUntilChanged(),
       cache()
     );
 
