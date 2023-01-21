@@ -37,7 +37,7 @@ export class CreateAction {
       return;
     }
 
-    await this.uploadAction(files[0]);
+    await this.uploadAction(files[0]!);
   }
 
 }
