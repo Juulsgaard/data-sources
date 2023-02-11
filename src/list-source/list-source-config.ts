@@ -1,5 +1,6 @@
 import {
-  RenderValueDataType, RenderDataTypes, RenderDataValueType, SortableRenderDataTypes, SortableRenderValueTypes
+  RenderValueDataType, RenderDataTypes, RenderDataValueType, SortableRenderDataTypes, SortableValueTypes,
+  SortingTypes, SortingValueType
 } from "../models/render-types";
 import {FilterService} from "../filtering/filter-service";
 import {
@@ -7,7 +8,7 @@ import {
   TableColumn, TableColumnOptions
 } from "./list-data";
 import {ListDataSource} from "./list-data-source";
-import {getRenderDataTypeSorting} from "../lib/sorting";
+import {getRenderDataTypeSorting, getSortingTypeSorting} from "../lib/sorting";
 import {arrToObj, getSelectorFn, KeysOfType, lowerFirst, SortFn, WithId} from "@consensus-labs/ts-tools";
 
 
@@ -16,7 +17,7 @@ type TableColumnConfigs<TModel extends WithId> = {
 };
 
 type SortColumnConfigs<TModel extends WithId> = {
-  [key in keyof typeof SortableRenderDataTypes as Uncapitalize<key>]: SortColumnConfig<TModel, RenderDataValueType<typeof RenderDataTypes[key]>>
+  [key in keyof typeof SortingTypes as Uncapitalize<key>]: SortColumnConfig<TModel, typeof SortingTypes[key]>
 } & {model: SortModelConfig<TModel>};
 
 //<editor-fold desc="Interfaces">
@@ -295,12 +296,12 @@ class SearchColumnConfig<TModel extends WithId> {
   }
 }
 
-class SortColumnConfig<TModel extends WithId, TData extends SortableRenderValueTypes> {
+class SortColumnConfig<TModel extends WithId, TSort extends SortingTypes> {
 
-  private readonly baseSort: SortFn<TData|undefined>;
+  private readonly baseSort: SortFn<SortingValueType<TSort>|undefined>;
 
-  constructor(type: RenderValueDataType<TData>, private config: ListDataSourceConfig<TModel>) {
-    this.baseSort = getRenderDataTypeSorting<TData>(type);
+  constructor(type: TSort, private config: ListDataSourceConfig<TModel>) {
+    this.baseSort = getSortingTypeSorting(type);
   }
 
   /**
@@ -309,7 +310,7 @@ class SortColumnConfig<TModel extends WithId, TData extends SortableRenderValueT
    * @param title - The sorting name
    * @param defaultSort - Define if this should be the default sort
    */
-  prop(key: KeysOfType<TModel, TData>, title: string, defaultSort?: boolean) {
+  prop(key: KeysOfType<TModel, SortingValueType<TSort>>, title: string, defaultSort?: boolean) {
     const map = getSelectorFn(key);
     this.config.sortColumns.set(key.toString(), {
       id: key.toString(),
@@ -327,7 +328,7 @@ class SortColumnConfig<TModel extends WithId, TData extends SortableRenderValueT
    * @param title - The name of the sort
    * @param defaultSort - Define if this should be the default sort
    */
-  add(id: string, map: (model: TModel) => TData, title: string, defaultSort?: boolean) {
+  add(id: string, map: (model: TModel) => SortingValueType<TSort>, title: string, defaultSort?: boolean) {
     this.config.sortColumns.set(id, {
       id,
       title,

@@ -4,7 +4,7 @@ import {
   TreeSearchColumnConfig, TreeSortConfig
 } from "./tree-data";
 import {
-  RenderValueDataType, RenderDataValueType, RenderDataTypes, SortableRenderValueTypes, SortableRenderDataTypes,
+  RenderValueDataType, RenderDataValueType, RenderDataTypes, SortableValueTypes, SortableRenderDataTypes,
   SortingTypes, SortingValueType
 } from "../models/render-types";
 import {getRenderDataTypeSorting, getSortingTypeSorting} from "../lib/sorting";

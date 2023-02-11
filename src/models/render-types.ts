@@ -17,8 +17,6 @@ const {Template, Void, ...sortableRenderDataTypes} = RenderDataTypes;
 export const SortableRenderDataTypes = sortableRenderDataTypes;
 export type SortableRenderDataTypes = Exclude<RenderDataTypes, RenderDataTypes.Template | RenderDataTypes.Void>;
 
-export type SortableRenderValueTypes = string | Date | number | boolean;
-
 /**
  * Map primary types to RenderDataType
  */
@@ -43,6 +41,8 @@ export type RenderDataValueType<T extends RenderDataTypes> =
           T extends RenderDataTypes.Template ? unknown :
             T extends RenderDataTypes.Void ? void :
               never;
+
+export type SortableValueTypes = string | Date | number | boolean;
 
 export enum SortingTypes {
   Alph = "Alphabetical",

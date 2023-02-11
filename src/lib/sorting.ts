@@ -1,11 +1,11 @@
 import {
-    RenderValueDataType, RenderDataTypes, SortableRenderDataTypes, SortableRenderValueTypes, SortingTypes,
+    RenderValueDataType, RenderDataTypes, SortableRenderDataTypes, SortableValueTypes, SortingTypes,
     SortingValueType
 } from "../models/render-types";
 import {sortAlphAsc, sortBoolAsc, sortDateAsc, SortFn, sortNumAsc} from "@consensus-labs/ts-tools";
 
 
-export function getRenderDataTypeSorting<TVal extends SortableRenderValueTypes>(type: RenderValueDataType<TVal>): SortFn<TVal|undefined>;
+export function getRenderDataTypeSorting<TVal extends SortableValueTypes>(type: RenderValueDataType<TVal>): SortFn<TVal|undefined>;
 export function getRenderDataTypeSorting<TVal>(type: RenderValueDataType<TVal>): RenderTypeSort<TVal>;
 export function getRenderDataTypeSorting(type: RenderDataTypes): SortFn<any|undefined>|undefined {
     switch (type) {
@@ -29,7 +29,7 @@ export function getRenderDataTypeSorting(type: RenderDataTypes): SortFn<any|unde
     }
 }
 
-type RenderTypeSort<TVal> = TVal extends SortableRenderValueTypes ? SortFn<TVal|undefined> : undefined;
+type RenderTypeSort<TVal> = TVal extends SortableValueTypes ? SortFn<TVal|undefined> : undefined;
 
 export function getSortingTypeSorting<T extends SortingTypes>(type: T): SortFn<SortingValueType<T>|undefined> {
     switch (type) {

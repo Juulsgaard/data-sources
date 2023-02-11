@@ -10,5 +10,5 @@ export {ListRange, ListSelection} from "./list-source/list-state";
 export {TreeRange, TreeSelection, TreeState, TreeSelectionState} from "./tree-source/tree-state";
 export {CreateAction} from "./models/create-action";
 export {GridData, ListData, ListSearchData, ListUniversalData, TableColumn, TableData, ListFlag} from "./list-source/list-data";
-export {RenderDataTypes} from "./models/render-types";
-export {DataSource} from "./constructor";
+export {RenderDataTypes, SortingTypes} from "./models/render-types";
+export {DataSource, Data} from "./constructor";
