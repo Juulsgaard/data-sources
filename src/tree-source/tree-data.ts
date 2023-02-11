@@ -1,6 +1,6 @@
 
 import {TreeFolderFilterService, TreeItemFilterService} from "../filtering/filter-service";
-import {RenderDataType} from "../models/render-types";
+import {RenderValueDataType} from "../models/render-types";
 import {BulkRelocateModel, MoveModel} from "../models/move";
 import {Selection, SimpleObject, SortFn} from "@consensus-labs/ts-tools";
 import {ThemeColor} from "../lib/types";
@@ -114,7 +114,7 @@ export interface TreeSearchColumnConfig<TFolder, TFolderData, TItem, TItemData> 
  */
 export interface TreeSearchColumnConfigUnit<TModel, TMeta, TData> {
   mapData: (data: TModel, meta: TMeta) => TData;
-  dataType: RenderDataType<TData>;
+  dataType: RenderValueDataType<TData>;
 }
 
 //</editor-fold>

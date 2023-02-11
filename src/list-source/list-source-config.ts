@@ -1,4 +1,6 @@
-import {RenderDataPrimaryTypes, RenderDataType, RenderDataTypeLookup, RenderDataTypes} from "../models/render-types";
+import {
+  RenderValueDataType, RenderDataTypes, RenderDataValueType, SortableRenderDataTypes, SortableRenderValueTypes
+} from "../models/render-types";
 import {FilterService} from "../filtering/filter-service";
 import {
   GridDataConfig, HiddenSearchColumn, HiddenSortColumn, ListActionOptions, ListDataConfig, ListDataSourceOptions,
@@ -10,11 +12,11 @@ import {arrToObj, getSelectorFn, KeysOfType, lowerFirst, SortFn, WithId} from "@
 
 
 type TableColumnConfigs<TModel extends WithId> = {
-  [key in keyof typeof RenderDataTypes as Uncapitalize<key>]: TableColumnConfig<TModel, RenderDataTypeLookup<typeof RenderDataTypes[key]>|undefined>
+  [key in keyof typeof RenderDataTypes as Uncapitalize<key>]: TableColumnConfig<TModel, RenderDataValueType<typeof RenderDataTypes[key]>|undefined>
 };
 
 type SortColumnConfigs<TModel extends WithId> = {
-  [key in keyof typeof RenderDataTypes as Uncapitalize<key>]: SortColumnConfig<TModel, RenderDataTypeLookup<typeof RenderDataTypes[key]>|undefined>
+  [key in keyof typeof SortableRenderDataTypes as Uncapitalize<key>]: SortColumnConfig<TModel, RenderDataValueType<typeof RenderDataTypes[key]>>
 } & {model: SortModelConfig<TModel>};
 
 //<editor-fold desc="Interfaces">
@@ -200,13 +202,9 @@ export class ListDataSourceConfig<TModel extends WithId> implements IListDataSou
 //</editor-fold>
 
 //<editor-fold desc="Column Config">
-class TableColumnConfig<TModel extends WithId, TData extends RenderDataPrimaryTypes> {
+class TableColumnConfig<TModel extends WithId, TData> {
 
-  private readonly baseSort: SortFn<TData|undefined>;
-
-  constructor(private type: RenderDataType<TData>, private config: ListDataSourceConfig<TModel>) {
-    this.baseSort = getRenderDataTypeSorting(type);
-  }
+  constructor(private type: RenderValueDataType<TData>, private config: ListDataSourceConfig<TModel>) { }
 
   /**
    * Define a column based on a property
@@ -216,15 +214,16 @@ class TableColumnConfig<TModel extends WithId, TData extends RenderDataPrimaryTy
    */
   prop(key: KeysOfType<TModel, TData>, title: string, options?: TableColumnOptions<TModel, TData>) {
     const map = getSelectorFn(key);
+
     this.config.tableColumns.set(key.toString(), {
       id: key.toString(),
       title,
       mapData: map,
       dataType: this.type,
-      sortFn: options?.customSort ?? ((a, b) => this.baseSort(map(a), map(b))),
+      sortFn: this.getSort(map, options),
       defaultSort: !!options?.defaultSort,
       searchable: !!options?.searchable,
-      searchWeight: options?.searchWeight
+      searchWeight: options?.searchWeight,
     });
     return this.config;
   }
@@ -242,12 +241,21 @@ class TableColumnConfig<TModel extends WithId, TData extends RenderDataPrimaryTy
       title,
       mapData: map,
       dataType: this.type,
-      sortFn: options?.customSort ?? ((a, b) => this.baseSort(map(a), map(b))),
+      sortFn: this.getSort(map, options),
       defaultSort: !!options?.defaultSort,
       searchable: !!options?.searchable,
       searchWeight: options?.searchWeight
     });
     return this.config;
+  }
+
+  private getSort(map: (model: TModel) => TData, options: TableColumnOptions<TModel, TData>|undefined): SortFn<TModel>|undefined {
+    if (!options) return undefined;
+    if (options.customSort) return options.customSort;
+    if (!options.typeSort) return undefined;
+    const sortFn = getRenderDataTypeSorting(this.type);
+    if (!sortFn) return undefined;
+    return (a, b) => sortFn(map(a), map(b));
   }
 }
 
@@ -287,12 +295,12 @@ class SearchColumnConfig<TModel extends WithId> {
   }
 }
 
-class SortColumnConfig<TModel extends WithId, TData extends RenderDataPrimaryTypes> {
+class SortColumnConfig<TModel extends WithId, TData extends SortableRenderValueTypes> {
 
   private readonly baseSort: SortFn<TData|undefined>;
 
-  constructor(type: RenderDataType<TData>, private config: ListDataSourceConfig<TModel>) {
-    this.baseSort = getRenderDataTypeSorting(type);
+  constructor(type: RenderValueDataType<TData>, private config: ListDataSourceConfig<TModel>) {
+    this.baseSort = getRenderDataTypeSorting<TData>(type);
   }
 
   /**

@@ -1,7 +1,7 @@
 import {FilterService} from "../filtering/filter-service";
 import {ThemeColor} from "../lib/types";
 import {SortFn} from "@consensus-labs/ts-tools";
-import {RenderDataType} from "../models/render-types";
+import {RenderValueDataType, SortableRenderValueTypes} from "../models/render-types";
 
 //<editor-fold desc="Column Data">
 
@@ -9,7 +9,7 @@ export interface TableColumn<TItem, TData> {
     id: string;
     title: string;
     mapData: (data: TItem) => TData;
-    dataType: RenderDataType<TData>;
+    dataType: RenderValueDataType<TData>;
     sortFn?: SortFn<TItem>;
     defaultSort: boolean;
     searchable: boolean;
@@ -18,7 +18,7 @@ export interface TableColumn<TItem, TData> {
 
 export interface TableColumnOptions<TModel, TData> {
     /** Sort the column with a default algorithm based on the data type */
-    typeSort?: boolean;
+    typeSort?: TData extends SortableRenderValueTypes ? boolean : false;
     /** Define a custom sorting method for the column */
     customSort?: (a: TModel, b: TModel) => number;
     /** Mark this column as the default used for sorting */

@@ -1,37 +1,59 @@
 export enum RenderDataTypes {
-  Number = 'Number',
   String = 'String',
-  HTML = 'HTML',
-  Date = 'Date',
-  Icon = 'Icon',
+  Html = 'HTML',
+  Number = 'Number',
   Decimal = 'Decimal',
-  Template = 'Template',
   Bool = 'Bool',
+  Date = 'Date',
+  DateTime = 'DateTime',
+  Time = 'Time',
+  Icon = 'Icon',
+  Image = 'Image',
+  Template = 'Template',
   Void = 'Void',
 }
 
-export type RenderDataPrimaryTypes = string|Date|number|boolean|null|undefined;
+const {Template, Void, ...sortableRenderDataTypes} = RenderDataTypes;
+export const SortableRenderDataTypes = sortableRenderDataTypes;
+export type SortableRenderDataTypes = Exclude<RenderDataTypes, RenderDataTypes.Template | RenderDataTypes.Void>;
+
+export type SortableRenderValueTypes = string | Date | number | boolean;
 
 /**
  * Map primary types to RenderDataType
  */
-export type RenderDataType<T> =
-  T extends string ? RenderDataTypes.String | RenderDataTypes.HTML | RenderDataTypes.Icon :
-    T extends Date ? RenderDataTypes.Date :
+export type RenderValueDataType<T> = StrictRenderDataType<T> | RenderDataTypes.Template;
+
+type StrictRenderDataType<T> =
+  T extends string ? RenderDataTypes.String | RenderDataTypes.Html | RenderDataTypes.Icon | RenderDataTypes.Image :
+    T extends Date ? RenderDataTypes.Date | RenderDataTypes.DateTime | RenderDataTypes.Time :
       T extends number ? RenderDataTypes.Number | RenderDataTypes.Decimal :
         T extends boolean ? RenderDataTypes.Bool :
-          T extends null ? RenderDataTypes.Template :
-            T extends void ? RenderDataTypes.Void :
-              never;
+          T extends void ? RenderDataTypes.Void :
+            never;
 
 /**
  * Convert RenderDataType to primary type
  */
-export type RenderDataTypeLookup<T extends RenderDataTypes> =
-  T extends RenderDataTypes.String | RenderDataTypes.HTML | RenderDataTypes.Icon ? string :
-    T extends RenderDataTypes.Date ? Date :
+export type RenderDataValueType<T extends RenderDataTypes> =
+  T extends RenderDataTypes.String | RenderDataTypes.Html | RenderDataTypes.Icon | RenderDataTypes.Image ? string :
+    T extends RenderDataTypes.Date | RenderDataTypes.DateTime | RenderDataTypes.Time ? Date :
       T extends RenderDataTypes.Number | RenderDataTypes.Decimal ? number :
         T extends RenderDataTypes.Bool ? boolean :
-          T extends RenderDataTypes.Template ? null :
-            T extends RenderDataTypes.Void ? undefined :
+          T extends RenderDataTypes.Template ? unknown :
+            T extends RenderDataTypes.Void ? void :
               never;
+
+export enum SortingTypes {
+  Alph = "Alphabetical",
+  Num = "Numerical",
+  Date = "Dates",
+  Bool = "Boolean"
+}
+
+export type SortingValueType<T extends SortingTypes> =
+  T extends SortingTypes.Alph ? string :
+    T extends SortingTypes.Date ? Date :
+      T extends SortingTypes.Num ? number :
+        T extends SortingTypes.Bool ? boolean :
+          never;

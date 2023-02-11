@@ -15,7 +15,7 @@ import {
 } from "./tree-data";
 import {TreeFolderFilterState, TreeItemFilterState} from "../filtering/filter-service";
 import {BulkRelocateModel, MoveModel} from "../models/move";
-import {cache} from "../lib/rxjs";
+import {cache} from "@consensus-labs/rxjs-tools";
 import {TreeDataOptionConfig} from "./tree-source-config";
 import {DetachedSearchData} from "../models/detached-search";
 import {
@@ -25,14 +25,6 @@ import {Sort} from "../lib/types";
 import {ListAction} from "../list-source/list-data";
 
 export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
-
-  public static withItemParent<TFolder extends WithId, TItem extends WithId>(parentId: Selection<TItem, string>) {
-    return new TreeDataOptionConfig<TFolder, TItem>(parentId, undefined);
-  }
-
-  public static withFolderChildren<TFolder extends WithId, TItem extends WithId>(folderChildren: Selection<TFolder, TItem[]>) {
-    return new TreeDataOptionConfig<TFolder, TItem>(undefined, folderChildren);
-  }
 
   //<editor-fold desc="Outputs">
   treeData$: Observable<TreeFolderData<TFolder, TItem>[]>;

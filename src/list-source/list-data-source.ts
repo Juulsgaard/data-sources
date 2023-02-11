@@ -4,24 +4,16 @@ import Fuse from "fuse.js";
 import {FilterServiceState} from "../filtering/filter-service";
 import {
   GridData, GridDataConfig, HiddenSearchColumn, HiddenSortColumn, ListAction, ListActionConfig, ListData,
-  ListDataConfig,
-  ListDataSourceOptions, ListFlag,
-  ListSearchData,
-  ListUniversalData, TableColumn, TableData
+  ListDataConfig, ListDataSourceOptions, ListFlag, ListSearchData, ListUniversalData, TableColumn, TableData
 } from "./list-data";
-import {IListDataSourceConfig, ListDataSourceConfig} from "./list-source-config";
-import {cache} from "../lib/rxjs";
 import {ISorted, sortByIndexAsc} from "../lib/index-sort";
 import {DetachedSearchData} from "../models/detached-search";
-import FuseResult = Fuse.FuseResult;
 import {applyQueryParam, arrToMap, mapArr, mapToArr, SimpleObject, SortFn, WithId} from "@consensus-labs/ts-tools";
 import {Page, Sort} from "../lib/types";
+import FuseResult = Fuse.FuseResult;
+import {cache} from "@consensus-labs/rxjs-tools";
 
 export class ListDataSource<TModel extends WithId> {
-
-  public static build<TModel extends WithId>(): IListDataSourceConfig<TModel> {
-    return new ListDataSourceConfig<TModel>();
-  }
 
   public columnIds: string[];
   public columns: TableColumn<TModel, any>[];

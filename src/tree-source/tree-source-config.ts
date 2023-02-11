@@ -3,8 +3,11 @@ import {
   TreeHiddenSortColumnConfig, TreeItemActionOptions, TreeItemMap, TreeMoveActions, TreeRowConfig,
   TreeSearchColumnConfig, TreeSortConfig
 } from "./tree-data";
-import {RenderDataPrimaryTypes, RenderDataType, RenderDataTypeLookup, RenderDataTypes} from "../models/render-types";
-import {getRenderDataTypeSorting} from "../lib/sorting";
+import {
+  RenderValueDataType, RenderDataValueType, RenderDataTypes, SortableRenderValueTypes, SortableRenderDataTypes,
+  SortingTypes, SortingValueType
+} from "../models/render-types";
+import {getRenderDataTypeSorting, getSortingTypeSorting} from "../lib/sorting";
 import {TreeDataSource} from "./tree-data-source";
 import {TreeFolderFilterService, TreeItemFilterService} from "../filtering/filter-service";
 import {ISorted, sortByIndexAsc} from "../lib/index-sort";
@@ -217,10 +220,11 @@ export class TreeDataOptionConfig<TFolder extends WithId, TItem extends WithId> 
 
 //<editor-fold desc="Types">
 type SearchColumnConfigs<TFolder extends WithId, TItem extends WithId> = {
-  [key in keyof typeof RenderDataTypes as Uncapitalize<key>]: SearchColumnConfig<TFolder, TItem, RenderDataTypeLookup<typeof RenderDataTypes[key]>|undefined>
+  [key in keyof typeof RenderDataTypes as Uncapitalize<key>]: SearchColumnConfig<TFolder, TItem, RenderDataValueType<typeof RenderDataTypes[key]>|undefined>
 };
-type SearchColumnItemConfigs<TFolder extends WithId, TItem extends WithId, TData extends RenderDataPrimaryTypes> = {
-  [key in keyof typeof RenderDataTypes as Uncapitalize<key>]: SearchColumnItemConfig<TFolder, TData, TItem, RenderDataTypeLookup<typeof RenderDataTypes[key]>|undefined>
+
+type SearchColumnItemConfigs<TFolder extends WithId, TItem extends WithId, TData> = {
+  [key in keyof typeof RenderDataTypes as Uncapitalize<key>]: SearchColumnItemConfig<TFolder, TData, TItem, RenderDataValueType<typeof RenderDataTypes[key]>|undefined>
 };
 
 type ColumnCreator<TFolder extends WithId, TItem extends WithId> = {
@@ -315,9 +319,9 @@ class TreeDataSourceConfig<TFolder extends WithId, TItem extends WithId> impleme
 //</editor-fold>
 
 //<editor-fold desc="Column Builders">
-class SearchColumnConfig<TFolder extends WithId, TItem extends WithId, TData extends RenderDataPrimaryTypes> {
+class SearchColumnConfig<TFolder extends WithId, TItem extends WithId, TData> {
 
-  constructor(private type: RenderDataType<TData>, private rootConfig: TreeDataSourceConfig<TFolder, TItem>) {
+  constructor(private type: RenderValueDataType<TData>, private rootConfig: TreeDataSourceConfig<TFolder, TItem>) {
   }
 
   /**
@@ -358,7 +362,7 @@ class SearchColumnConfig<TFolder extends WithId, TItem extends WithId, TData ext
   }
 }
 
-class SearchColumnMidConfig<TFolder extends WithId, TItem extends WithId, TData extends RenderDataPrimaryTypes> {
+class SearchColumnMidConfig<TFolder extends WithId, TItem extends WithId, TData> {
 
   /** Include items in the column */
   item: SearchColumnItemConfigs<TFolder, TItem, TData>;
@@ -388,11 +392,11 @@ class SearchColumnMidConfig<TFolder extends WithId, TItem extends WithId, TData 
 
 }
 
-class SearchColumnItemConfig<TFolder extends WithId, TFolderData extends RenderDataPrimaryTypes, TItem extends WithId, TItemData extends RenderDataPrimaryTypes> {
+class SearchColumnItemConfig<TFolder extends WithId, TFolderData, TItem extends WithId, TItemData> {
 
   constructor(
     private partialConfig: Omit<TreeSearchColumnConfig<TFolder, TFolderData, TItem, any>, 'item'>,
-    private type: RenderDataType<TItemData>,
+    private type: RenderValueDataType<TItemData>,
     private rootConfig: TreeDataSourceConfig<TFolder, TItem>
   ) {
   }
@@ -429,7 +433,7 @@ class SearchColumnItemConfig<TFolder extends WithId, TFolderData extends RenderD
   }
 }
 
-class SearchColumnFinalConfig<TFolder extends WithId, TFolderData extends RenderDataPrimaryTypes, TItem extends WithId, TItemData extends RenderDataPrimaryTypes> {
+class SearchColumnFinalConfig<TFolder extends WithId, TFolderData, TItem extends WithId, TItemData> {
 
   constructor(
     private config: TreeSearchColumnConfig<TFolder, TFolderData, TItem, TItemData>,
@@ -443,16 +447,16 @@ class SearchColumnFinalConfig<TFolder extends WithId, TFolderData extends Render
    * @param mapItem - Map the item data for the sorting
    * @param type - The data type for the sorting
    */
-  withSorting<TSort>(
-    mapFolder: TreeFolderMap<TFolder, TItem, TSort>,
-    mapItem: TreeItemMap<TFolder, TItem, TSort>,
-    type: RenderDataType<TSort>
+  withSorting<T extends SortingTypes>(
+    type: T,
+    mapFolder: TreeFolderMap<TFolder, TItem, SortingValueType<T>>,
+    mapItem: TreeItemMap<TFolder, TItem, SortingValueType<T>>,
   ) {
     this.config.sorting = {
       folderSortData: mapFolder,
       itemSortData: mapItem,
-      sortFn: getRenderDataTypeSorting(type)
-    } as TreeSortConfig<TFolder, TItem, TSort>;
+      sortFn: getSortingTypeSorting(type)
+    } as TreeSortConfig<TFolder, TItem, SortingValueType<T>>;
     return this;
   }
 

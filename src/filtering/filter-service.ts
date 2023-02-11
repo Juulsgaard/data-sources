@@ -4,7 +4,7 @@ import {BaseTreeFolder, BaseTreeItem} from "../tree-source/tree-data";
 import {deepCopy} from "@consensus-labs/ts-tools";
 import {FilterAdapter, FilterReadState, FilterSaveState, MappedReadState} from "./filter-adapter";
 import {DataFilter, IndividualDataFilter} from "./data-filter";
-import {cache} from "../lib/rxjs";
+import {cache} from "@consensus-labs/rxjs-tools";
 
 export class FilterServiceState<TFilter, TModel> {
 
