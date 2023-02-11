@@ -10,8 +10,8 @@ import {ISorted, sortByIndexAsc} from "../lib/index-sort";
 import {DetachedSearchData} from "../models/detached-search";
 import {applyQueryParam, arrToMap, mapArr, mapToArr, SimpleObject, SortFn, WithId} from "@consensus-labs/ts-tools";
 import {Page, Sort} from "../lib/types";
-import FuseResult = Fuse.FuseResult;
 import {cache} from "@consensus-labs/rxjs-tools";
+import FuseResult = Fuse.FuseResult;
 
 export class ListDataSource<TModel extends WithId> {
 

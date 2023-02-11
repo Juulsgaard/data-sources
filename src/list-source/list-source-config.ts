@@ -1,6 +1,5 @@
 import {
-  RenderValueDataType, RenderDataTypes, RenderDataValueType, SortableRenderDataTypes, SortableValueTypes,
-  SortingTypes, SortingValueType
+  RenderDataTypes, RenderDataValueType, RenderValueDataType, SortingTypes, SortingValueType
 } from "../models/render-types";
 import {FilterService} from "../filtering/filter-service";
 import {
@@ -9,7 +8,9 @@ import {
 } from "./list-data";
 import {ListDataSource} from "./list-data-source";
 import {getRenderDataTypeSorting, getSortingTypeSorting} from "../lib/sorting";
-import {arrToObj, getSelectorFn, KeysOfType, lowerFirst, SortFn, WithId} from "@consensus-labs/ts-tools";
+import {
+  arrToObj, getSelectorFn, isString, KeysOfTypeOrNull, lowerFirst, MapFunc, SortFn, WithId
+} from "@consensus-labs/ts-tools";
 
 
 type TableColumnConfigs<TModel extends WithId> = {
@@ -213,7 +214,7 @@ class TableColumnConfig<TModel extends WithId, TData> {
    * @param title - The column name
    * @param options - Column options
    */
-  prop(key: KeysOfType<TModel, TData>, title: string, options?: TableColumnOptions<TModel, TData>) {
+  prop(key: KeysOfTypeOrNull<TModel, TData>, title: string, options?: TableColumnOptions<TModel, TData>) {
     const map = getSelectorFn(key);
 
     this.config.tableColumns.set(key.toString(), {
@@ -225,7 +226,7 @@ class TableColumnConfig<TModel extends WithId, TData> {
       defaultSort: !!options?.defaultSort,
       searchable: !!options?.searchable,
       searchWeight: options?.searchWeight,
-    });
+    } satisfies TableColumn<TModel, TData>);
     return this.config;
   }
 
@@ -236,7 +237,7 @@ class TableColumnConfig<TModel extends WithId, TData> {
    * @param map - Data mapping for the column
    * @param options - Column options
    */
-  add(id: string, title: string, map: (model: TModel) => TData, options?: TableColumnOptions<TModel, TData>) {
+  add(id: string, title: string, map: MapFunc<TModel, TData|undefined>, options?: TableColumnOptions<TModel, TData>) {
     this.config.tableColumns.set(id, {
       id,
       title,
@@ -246,11 +247,11 @@ class TableColumnConfig<TModel extends WithId, TData> {
       defaultSort: !!options?.defaultSort,
       searchable: !!options?.searchable,
       searchWeight: options?.searchWeight
-    });
+    } satisfies TableColumn<TModel, TData>);
     return this.config;
   }
 
-  private getSort(map: (model: TModel) => TData, options: TableColumnOptions<TModel, TData>|undefined): SortFn<TModel>|undefined {
+  private getSort(map: MapFunc<TModel, TData|undefined>, options: TableColumnOptions<TModel, TData>|undefined): SortFn<TModel>|undefined {
     if (!options) return undefined;
     if (options.customSort) return options.customSort;
     if (!options.typeSort) return undefined;
@@ -270,7 +271,7 @@ class SearchColumnConfig<TModel extends WithId> {
    * @param key - The property to use
    * @param weight - Optional search weighting
    */
-  prop(key: KeysOfType<TModel, string|undefined>, weight?: number) {
+  prop(key: KeysOfTypeOrNull<TModel, string>, weight?: number) {
     const map = getSelectorFn(key);
     this.config.searchColumns.set(key.toString(), {
       id: key.toString(),
@@ -286,7 +287,7 @@ class SearchColumnConfig<TModel extends WithId> {
    * @param map - Define the data mapping
    * @param weight - Optional search weighting
    */
-  add(id: string, map: (model: TModel) => string, weight?: number) {
+  add(id: string, map: MapFunc<TModel, string|undefined>, weight?: number) {
     this.config.searchColumns.set(id, {
       id: id,
       mapData: map,
@@ -310,14 +311,14 @@ class SortColumnConfig<TModel extends WithId, TSort extends SortingTypes> {
    * @param title - The sorting name
    * @param defaultSort - Define if this should be the default sort
    */
-  prop(key: KeysOfType<TModel, SortingValueType<TSort>>, title: string, defaultSort?: boolean) {
+  prop(key: KeysOfTypeOrNull<TModel, SortingValueType<TSort>>, title: string, defaultSort?: boolean) {
     const map = getSelectorFn(key);
     this.config.sortColumns.set(key.toString(), {
       id: key.toString(),
       title,
       sortFn: (a, b) => this.baseSort(map(a), map(b)),
       defaultSort: !!defaultSort
-    });
+    } satisfies HiddenSortColumn<TModel, SortingValueType<TSort>>);
     return this.config;
   }
 
@@ -328,13 +329,13 @@ class SortColumnConfig<TModel extends WithId, TSort extends SortingTypes> {
    * @param title - The name of the sort
    * @param defaultSort - Define if this should be the default sort
    */
-  add(id: string, map: (model: TModel) => SortingValueType<TSort>, title: string, defaultSort?: boolean) {
+  add(id: string, map: (model: TModel) => SortingValueType<TSort>|undefined, title: string, defaultSort?: boolean) {
     this.config.sortColumns.set(id, {
       id,
       title,
       sortFn: (a, b) => this.baseSort(map(a), map(b)),
       defaultSort: !!defaultSort
-    });
+    } satisfies HiddenSortColumn<TModel, SortingValueType<TSort>>);
     return this.config;
   }
 }
@@ -367,15 +368,18 @@ class SortModelConfig<TModel extends WithId> {
 //<editor-fold desc="List Config">
 class ListConfig<TModel extends WithId> {
 
+  private listConfig: ListDataConfig<TModel>;
+
   constructor(private config: ListDataSourceConfig<TModel>) {
+    this.listConfig = config.listConfig!;
   }
 
   /**
    * Add a second line to the List Rendering
    * @param secondLine
    */
-  secondLine(secondLine: (model: TModel) => string) {
-    this.config.listConfig!.secondLine = secondLine;
+  secondLine(secondLine: MapFunc<TModel, string|undefined>) {
+    this.listConfig.secondLine = secondLine;
     return this;
   }
 
@@ -384,9 +388,9 @@ class ListConfig<TModel extends WithId> {
    * @param avatar - The url mapping
    * @param cacheBuster - An optional cache buster for the image
    */
-  avatar(avatar: (model: TModel) => string|undefined, cacheBuster?: (data: TModel) => string|Date|undefined) {
-    this.config.listConfig!.avatar = avatar;
-    this.config.listConfig!.avatarCacheBuster = cacheBuster;
+  avatar(avatar: MapFunc<TModel, string|undefined>, cacheBuster?: MapFunc<TModel, string|Date|undefined>) {
+    this.listConfig.avatar = avatar;
+    this.listConfig.avatarCacheBuster = cacheBuster;
     return this;
   }
 
@@ -395,7 +399,7 @@ class ListConfig<TModel extends WithId> {
    * @param avatarPlaceholder - Fallback URL
    */
   avatarPlaceholder(avatarPlaceholder: string) {
-    this.config.listConfig!.avatarPlaceholder = avatarPlaceholder;
+    this.listConfig.avatarPlaceholder = avatarPlaceholder;
     return this;
   }
 
@@ -403,8 +407,8 @@ class ListConfig<TModel extends WithId> {
    * Add an icon to the List Rendering
    * @param icon
    */
-  icon(icon: (model: TModel) => string) {
-    this.config.listConfig!.icon = icon;
+  icon(icon: MapFunc<TModel, string|undefined>|string) {
+    this.listConfig.icon = isString(icon) ? () => icon : icon;
     return this;
   }
 
@@ -414,7 +418,7 @@ class ListConfig<TModel extends WithId> {
    * @param condition - The condition for applying the style
    */
   style(cssClass: 'faded'|string, condition: (model: TModel) => boolean) {
-    this.config.listConfig!.styles.push({cssClass, condition});
+    this.listConfig.styles.push({cssClass, condition});
     return this;
   }
 
@@ -445,7 +449,7 @@ class GridConfig<TModel extends WithId> {
    * Add a sub-title to the Grid Rendering
    * @param subTitle
    */
-  subTitle(subTitle: (model: TModel) => string) {
+  subTitle(subTitle: MapFunc<TModel, string|undefined>) {
     this.config.gridConfig!.subTitle = subTitle;
     return this;
   }
@@ -455,7 +459,7 @@ class GridConfig<TModel extends WithId> {
    * @param image - The url mapping
    * @param cacheBuster - An optional cache buster for the image
    */
-  image(image: (model: TModel) => string | undefined, cacheBuster?: (data: TModel) => string|Date|undefined) {
+  image(image: MapFunc<TModel, string|undefined>, cacheBuster?: MapFunc<TModel, string|Date|undefined>) {
     this.config.gridConfig!.image = image;
     this.config.gridConfig!.imageCacheBuster = cacheBuster;
     return this;
@@ -474,8 +478,8 @@ class GridConfig<TModel extends WithId> {
    * Add an icon to the Grid Rendering
    * @param icon
    */
-  icon(icon: (model: TModel) => string | undefined) {
-    this.config.gridConfig!.icon = icon;
+  icon(icon: MapFunc<TModel, string|undefined>|string) {
+    this.config.gridConfig!.icon = isString(icon) ? () => icon : icon;
     return this;
   }
 

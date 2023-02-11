@@ -1,6 +1,5 @@
 import {
-    RenderValueDataType, RenderDataTypes, SortableRenderDataTypes, SortableValueTypes, SortingTypes,
-    SortingValueType
+  RenderDataTypes, RenderValueDataType, SortableValueTypes, SortingTypes, SortingValueType
 } from "../models/render-types";
 import {sortAlphAsc, sortBoolAsc, sortDateAsc, SortFn, sortNumAsc} from "@consensus-labs/ts-tools";
 

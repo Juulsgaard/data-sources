@@ -1,6 +1,6 @@
 import {FilterService} from "../filtering/filter-service";
 import {ThemeColor} from "../lib/types";
-import {SortFn} from "@consensus-labs/ts-tools";
+import {MapFunc, SortFn} from "@consensus-labs/ts-tools";
 import {RenderValueDataType, SortableValueTypes} from "../models/render-types";
 
 //<editor-fold desc="Column Data">
@@ -8,7 +8,7 @@ import {RenderValueDataType, SortableValueTypes} from "../models/render-types";
 export interface TableColumn<TItem, TData> {
     id: string;
     title: string;
-    mapData: (data: TItem) => TData;
+    mapData: (data: TItem) => TData|undefined;
     dataType: RenderValueDataType<TData>;
     sortFn?: SortFn<TItem>;
     defaultSort: boolean;
@@ -20,7 +20,7 @@ export interface TableColumnOptions<TModel, TData> {
     /** Sort the column with a default algorithm based on the data type */
     typeSort?: TData extends SortableValueTypes ? boolean : false;
     /** Define a custom sorting method for the column */
-    customSort?: (a: TModel, b: TModel) => number;
+    customSort?: SortFn<TModel>;
     /** Mark this column as the default used for sorting */
     defaultSort?: boolean;
     /** Include this column in the search index */
@@ -64,11 +64,11 @@ export interface ListData<TModel> {
  */
 export interface ListDataConfig<TItem> {
     firstLine: (data: TItem) => string;
-    secondLine?: (data: TItem) => string;
+    secondLine?: MapFunc<TItem, string|undefined>;
     avatar?: (data: TItem) => string|undefined;
     avatarCacheBuster?: (data: TItem) => string|Date|undefined;
     avatarPlaceholder?: string;
-    icon?: (data: TItem) => string;
+    icon?: MapFunc<TItem, string|undefined>;
     styles: {cssClass: string, condition: (data: TItem) => boolean}[];
 }
 //</editor-fold>
@@ -104,7 +104,7 @@ export interface GridData<TModel> {
  */
 export interface GridDataConfig<TItem> {
     title: (data: TItem) => string;
-    subTitle?: (data: TItem) => string;
+    subTitle?: (data: TItem) => string|undefined;
     image?: (data: TItem) => string|undefined;
     imageCacheBuster?: (data: TItem) => string|Date|undefined;
     imagePlaceholder?: string;

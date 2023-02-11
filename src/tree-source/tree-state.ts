@@ -1,5 +1,6 @@
 import {
-  auditTime, BehaviorSubject, combineLatest, delay, EMPTY, firstValueFrom, merge, Observable, Observer, of, shareReplay, Subscribable, Unsubscribable
+  auditTime, BehaviorSubject, combineLatest, delay, EMPTY, firstValueFrom, merge, Observable, Observer, of, shareReplay,
+  Subscribable, Unsubscribable
 } from "rxjs";
 import {distinctUntilChanged, filter, map, skip, switchMap} from "rxjs/operators";
 import {BaseTreeFolder, BaseTreeItem, TreeAsideData, TreeFolder, TreeItem} from "./tree-data";

@@ -4,15 +4,14 @@ import {
   TreeSearchColumnConfig, TreeSortConfig
 } from "./tree-data";
 import {
-  RenderValueDataType, RenderDataValueType, RenderDataTypes, SortableValueTypes, SortableRenderDataTypes,
-  SortingTypes, SortingValueType
+  RenderDataTypes, RenderDataValueType, RenderValueDataType, SortingTypes, SortingValueType
 } from "../models/render-types";
-import {getRenderDataTypeSorting, getSortingTypeSorting} from "../lib/sorting";
+import {getSortingTypeSorting} from "../lib/sorting";
 import {TreeDataSource} from "./tree-data-source";
 import {TreeFolderFilterService, TreeItemFilterService} from "../filtering/filter-service";
 import {ISorted, sortByIndexAsc} from "../lib/index-sort";
 import {
-  arrToObj, Conditional, getSelectorFn, KeysOfType, KeysOfTypeOrNull, lowerFirst, Selection, WithId
+  arrToObj, Conditional, getSelectorFn, KeysOfTypeOrNull, lowerFirst, Selection, WithId
 } from "@consensus-labs/ts-tools";
 
 //<editor-fold desc="Option Builder">
@@ -346,7 +345,7 @@ class SearchColumnConfig<TFolder extends WithId, TItem extends WithId, TData> {
    * @param title - The name of the column
    * @param map - The data mapping for the column
    */
-  add(id: string, title: string, map: TreeFolderMap<TFolder, TItem, TData>) {
+  add(id: string, title: string, map: TreeFolderMap<TFolder, TItem, TData|undefined>) {
     return this.continue({
       id,
       title,
@@ -381,7 +380,7 @@ class SearchColumnMidConfig<TFolder extends WithId, TItem extends WithId, TData>
 
   /** Don't include items in the column */
   noItem() {
-    return new SearchColumnFinalConfig<TFolder, TData, TItem, undefined>(
+    return new SearchColumnFinalConfig<TFolder, TData, TItem, void>(
       {
         ...this.partialConfig,
         item: {mapData: () => undefined, dataType: RenderDataTypes.Void}
@@ -405,7 +404,7 @@ class SearchColumnItemConfig<TFolder extends WithId, TFolderData, TItem extends 
    * Use an existing property for the item data
    * @param key - The property to use
    */
-  prop(key: KeysOfType<TItem, TItemData>) {
+  prop(key: KeysOfTypeOrNull<TItem, TItemData>) {
     return new SearchColumnFinalConfig<TFolder, TFolderData, TItem, TItemData>(
       {
         ...this.partialConfig,
@@ -419,7 +418,7 @@ class SearchColumnItemConfig<TFolder extends WithId, TFolderData, TItem extends 
    * Generate item data for the columns using a custom mapping
    * @param map - The data mapping for the column
    */
-  map(map: TreeItemMap<TFolder, TItem, TItemData>) {
+  map(map: TreeItemMap<TFolder, TItem, TItemData|undefined>) {
     return new SearchColumnFinalConfig<TFolder, TFolderData, TItem, TItemData>(
       {
         ...this.partialConfig,
@@ -449,8 +448,8 @@ class SearchColumnFinalConfig<TFolder extends WithId, TFolderData, TItem extends
    */
   withSorting<T extends SortingTypes>(
     type: T,
-    mapFolder: TreeFolderMap<TFolder, TItem, SortingValueType<T>>,
-    mapItem: TreeItemMap<TFolder, TItem, SortingValueType<T>>,
+    mapFolder: TreeFolderMap<TFolder, TItem, SortingValueType<T>|undefined>,
+    mapItem: TreeItemMap<TFolder, TItem, SortingValueType<T>|undefined>,
   ) {
     this.config.sorting = {
       folderSortData: mapFolder,

@@ -5,24 +5,19 @@ import {catchError, distinctUntilChanged, map, switchMap, tap, throttleTime} fro
 import Fuse from "fuse.js";
 import {
   BaseTreeFolder, BaseTreeItem, TreeAsideData, TreeAsideFolderData, TreeAsideItemData, TreeDataSourceOptions,
-  TreeFolder, TreeFolderAction, TreeFolderActionConfig, TreeFolderData,
-  TreeFolderSearchData, TreeFolderSearchRowData, TreeHiddenSearchColumnConfig, TreeHiddenSortColumnConfig, TreeItem,
-  TreeItemAction,
-  TreeItemActionConfig,
-  TreeItemData, TreeItemSearchData,
+  TreeFolder, TreeFolderAction, TreeFolderData, TreeFolderSearchData, TreeFolderSearchRowData,
+  TreeHiddenSearchColumnConfig, TreeHiddenSortColumnConfig, TreeItem, TreeItemAction, TreeItemData, TreeItemSearchData,
   TreeItemSearchRowData, TreeRowConfig, TreeSearchColumnConfig, TreeSearchConfig, TreeSearchData, TreeSearchRowData,
   TreeSortConfig
 } from "./tree-data";
 import {TreeFolderFilterState, TreeItemFilterState} from "../filtering/filter-service";
 import {BulkRelocateModel, MoveModel} from "../models/move";
 import {cache} from "@consensus-labs/rxjs-tools";
-import {TreeDataOptionConfig} from "./tree-source-config";
 import {DetachedSearchData} from "../models/detached-search";
 import {
-  applySelector, arrToLookup, arrToMap, mapArr, mapToArr, Selection, SimpleObject, SortFn, titleCase, WithId
+  applySelector, arrToLookup, arrToMap, mapArr, mapToArr, SimpleObject, SortFn, titleCase, WithId
 } from "@consensus-labs/ts-tools";
 import {Sort} from "../lib/types";
-import {ListAction} from "../list-source/list-data";
 
 export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
 
