@@ -126,13 +126,13 @@ export class ListDataSourceConfig<TModel extends WithId> implements IListDataSou
     this.table = arrToObj(
       Object.entries(RenderDataTypes),
       ([key, _]) => lowerFirst(key),
-      ([_, type]) => new TableColumnConfig<TModel, any>(type as RenderDataTypes, this),
+      ([_, type]) => new TableColumnConfig<TModel, any>(type, this),
     ) as TableColumnConfigs<TModel>;
 
     const sort = arrToObj(
-      Object.entries(RenderDataTypes),
+      Object.entries(SortingTypes),
       ([key, _]) => lowerFirst(key),
-      ([key, type]) => new SortColumnConfig<TModel, any>(type as RenderDataTypes, this)
+      ([_, type]) => new SortColumnConfig<TModel, any>(type, this)
     );
 
     this.sort = {...sort, model: new SortModelConfig(this)} as SortColumnConfigs<TModel>;
