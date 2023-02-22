@@ -1,6 +1,6 @@
 {
   "name": "@consensus-labs/data-sources",
-  "version": "1.8.3",
+  "version": "1.8.4",
   "description": "A system for managing lists and trees of data",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

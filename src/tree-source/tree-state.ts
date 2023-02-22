@@ -225,8 +225,6 @@ class BaseTreeState<TFolder extends WithId, TItem extends WithId> {
 
 export class TreeState<TFolder extends WithId, TItem extends WithId> extends BaseTreeState<TFolder, TItem> implements Subscribable<TItem | undefined> {
 
-  routeNav = false;
-
   private _folderId$ = new BehaviorSubject<string | undefined>(undefined);
   public folderId$: Observable<string | undefined>;
 
@@ -288,20 +286,9 @@ export class TreeState<TFolder extends WithId, TItem extends WithId> extends Bas
 
     this.item$ = this.baseItem$.pipe(map(x => x?.model));
 
-    const metaItem$ = combineLatest([dataSource.metaItemLookup$, this.itemId$]).pipe(
-      map(([lookup, id]) => id ? lookup.get(id) : undefined),
-      cache()
-    );
-
-    // Verify parentId on the cheaper baseItem before looking up the full metaItem
-    this.metaItem$ = combineLatest([this.itemId$, validatedFolderId$]).pipe(
-      switchMap(([id, parentId]) => !id || !parentId
-        ? of(undefined)
-        : dataSource.baseItemLookup$.pipe(
-          map(lookup => lookup.get(id)),
-          map(item => item && item.folderId === parentId ? item.model.id : undefined),
-        )
-      ),
+    // Verify parentId via the cheaper baseItem before looking up the full metaItem
+    this.metaItem$ = this.baseItem$.pipe(
+      map(x => x?.model.id),
       distinctUntilChanged(),
       switchMap(itemId => !itemId
         ? of(undefined)
@@ -309,12 +296,6 @@ export class TreeState<TFolder extends WithId, TItem extends WithId> extends Bas
           map(x => x.get(itemId))
         )
       ),
-      cache()
-    );
-
-    this.metaItem$ = combineLatest([metaItem$, validatedFolderId$]).pipe(
-      auditTime(0),
-      map(([item, folderId]) => !folderId || !item ? undefined : item.folderId === folderId ? item : undefined),
       cache()
     );
     //</editor-fold>
@@ -416,6 +397,117 @@ export class TreeState<TFolder extends WithId, TItem extends WithId> extends Bas
     this.setFolder(undefined);
   }
 }
+
+export class TreeItemState<TFolder extends WithId, TItem extends WithId> extends BaseTreeState<TFolder, TItem> implements Subscribable<TItem | undefined> {
+
+  private _itemId$ = new BehaviorSubject<string | undefined>(undefined);
+  public itemId$: Observable<string | undefined>;
+  public folderId$: Observable<string | undefined>;
+
+  folder$: Observable<TFolder | undefined>;
+  baseFolder$: Observable<BaseTreeFolder<TFolder> | undefined>;
+  metaFolder$: Observable<TreeFolder<TFolder, TItem> | undefined>;
+
+  item$: Observable<TItem | undefined>;
+  baseItem$: Observable<BaseTreeItem<TItem> | undefined>;
+  metaItem$: Observable<TreeItem<TFolder, TItem> | undefined>;
+
+  folderChanges$: Observable<TFolder>;
+  itemChanges$: Observable<TItem>;
+
+  asideData$: Observable<TreeAsideData<TFolder, TItem>>;
+
+  constructor(dataSource: TreeDataSource<TFolder, TItem>, folderId$?: Observable<string | undefined>, itemId$?: Observable<string | undefined>) {
+    super(dataSource);
+
+    this.itemId$ = merge(this._itemId$, itemId$ ?? EMPTY).pipe(cache(), distinctUntilChanged());
+
+    //<editor-fold desc="Item Value">
+    this.baseItem$ = combineLatest([dataSource.baseItemLookup$, this.itemId$]).pipe(
+      map(([lookup, id]) => id ? lookup.get(id) : undefined),
+      distinctUntilChanged(),
+      cache()
+    );
+
+    this.item$ = this.baseItem$.pipe(map(x => x?.model));
+
+    this.metaItem$ = this.itemId$.pipe(
+      switchMap(id => !id
+        ? of(undefined)
+        : dataSource.metaItemLookup$.pipe(map(lookup => lookup.get(id)))
+      ),
+      distinctUntilChanged(),
+      cache()
+    );
+    //</editor-fold>
+
+    this.folderId$ = this.baseItem$.pipe(map(x => x?.folderId), distinctUntilChanged(), cache());
+
+    this.asideData$ = dataSource.getSidebarData(this.folderId$);
+
+    //<editor-fold desc="Folder Values">
+    this.baseFolder$ = combineLatest([dataSource.baseFolderLookup$, this.folderId$]).pipe(
+      map(([lookup, id]) => id ? lookup.get(id) : undefined),
+      distinctUntilChanged(),
+      cache()
+    );
+
+    this.folder$ = this.baseFolder$.pipe(map(x => x?.model));
+
+    this.metaFolder$ = this.folderId$.pipe(
+      switchMap(id => !id
+        ? of(undefined)
+        : dataSource.metaFolderLookup$.pipe(map(lookup => lookup.get(id)))
+      ),
+      distinctUntilChanged(),
+      cache()
+    );
+    //</editor-fold>
+
+    //<editor-fold desc="Map Change Emitters">
+    this.folderChanges$ = this.folder$.pipe(
+      distinctUntilChanged(((a, b) => a?.id === b?.id)),
+      skip(1),
+      filter((x): x is TFolder => !!x),
+    );
+
+    this.itemChanges$ = this.item$.pipe(
+      distinctUntilChanged(((a, b) => a?.id === b?.id)),
+      skip(1),
+      filter((x): x is TItem => !!x),
+    )
+    //</editor-fold>
+  }
+
+  subscribe(observer: Partial<Observer<TItem | undefined>>): Unsubscribable {
+    return this.item$.subscribe(observer);
+  }
+
+  //<editor-fold desc="Set Item">
+  setItem(item: BaseTreeItem<TItem> | undefined) {
+    this._itemId$.next(item?.model.id);
+  }
+
+  async setItemId(itemId: string | undefined) {
+    this._itemId$.next(itemId);
+  }
+
+  //</editor-fold>
+
+  folderActive$(folderId: string): Observable<boolean> {
+    return this.baseFolder$.pipe(map(f => !!f && f.model.id === folderId))
+  }
+
+  itemActive$(itemId: string): Observable<boolean> {
+    return this.baseItem$.pipe(map(f => !!f && f.model.id === itemId))
+  }
+
+  clearItem() {
+    this.setItem(undefined);
+  }
+}
+
+export type AnyTreeState<TFolder extends WithId, TItem extends WithId> = TreeState<TFolder, TItem> | TreeItemState<TFolder, TItem>;
 
 export class TreeSelection<TFolder extends WithId, TItem extends WithId> extends BaseTreeState<TFolder, TItem> implements Subscribable<TItem | undefined> {
 
