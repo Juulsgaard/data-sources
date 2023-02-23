@@ -6,7 +6,7 @@ import {distinctUntilChanged, filter, map, skip, switchMap} from "rxjs/operators
 import {BaseTreeFolder, BaseTreeItem, TreeAsideData, TreeFolder, TreeItem} from "./tree-data";
 import {TreeDataSource} from "./tree-data-source";
 import {isString, WithId} from "@consensus-labs/ts-tools";
-import {cache} from "@consensus-labs/rxjs-tools";
+import {cache, latestValueFromOrDefault} from "@consensus-labs/rxjs-tools";
 
 export class TreeState<TFolder extends WithId, TItem extends WithId> implements Subscribable<TItem | undefined> {
 
@@ -146,21 +146,20 @@ export class TreeState<TFolder extends WithId, TItem extends WithId> implements 
 
   //<editor-fold desc="Set Folder">
   setFolder(folder: BaseTreeFolder<TFolder> | TreeFolder<TFolder, TItem> | undefined) {
-    if (!folder) {
+    this.setFolderId(folder?.model.id);
+  }
+
+  setFolderId(folderId: string | undefined) {
+    if (!folderId) {
       this._folderId$.next(undefined);
       this._itemId$.next(undefined);
       return;
     }
 
-    const id = isString(folder) ? folder : folder.model.id;
-    if (this._folderId$.value === id) return;
+    if (this._folderId$.value === folderId) return;
 
-    this._folderId$.next(id);
-    this._itemId$.next(undefined);
-  }
-
-  setFolderId(folderId: string | undefined) {
     this._folderId$.next(folderId);
+    this._itemId$.next(undefined);
   }
 
   //</editor-fold>
@@ -186,6 +185,7 @@ export class TreeItemState<TFolder extends WithId, TItem extends WithId> impleme
 
   private _itemId$ = new BehaviorSubject<string | undefined>(undefined);
   public itemId$: Observable<string | undefined>;
+  private _folderId$ = new BehaviorSubject<string | undefined>(undefined);
   public folderId$: Observable<string | undefined>;
 
   folder$: Observable<TFolder | undefined>;
@@ -224,7 +224,11 @@ export class TreeItemState<TFolder extends WithId, TItem extends WithId> impleme
     );
     //</editor-fold>
 
-    this.folderId$ = this.baseItem$.pipe(map(x => x?.folderId), distinctUntilChanged(), cache());
+    this.folderId$ = this.baseItem$.pipe(
+      switchMap(x => x ? of(x.folderId) : this._folderId$),
+      distinctUntilChanged(),
+      cache()
+    );
 
     this.asideData$ = dataSource.getSidebarData(this.folderId$);
 
@@ -268,14 +272,41 @@ export class TreeItemState<TFolder extends WithId, TItem extends WithId> impleme
 
   //<editor-fold desc="Set Item">
   setItem(item: BaseTreeItem<TItem> | undefined) {
-    this._itemId$.next(item?.model.id);
+    this.setItemId(item?.model.id);
   }
 
-  async setItemId(itemId: string | undefined) {
+  setItemId(itemId: string | undefined) {
+    if (itemId) {
+      this._itemId$.next(itemId);
+      return this._folderId$.next(undefined);
+    }
+
+    const currentFolderId = latestValueFromOrDefault(this.folderId$);
     this._itemId$.next(itemId);
+    this._folderId$.next(currentFolderId);
   }
 
   //</editor-fold>
+
+  //<editor-fold desc="Set Folder">
+  setFolder(folder: BaseTreeFolder<TFolder> | TreeFolder<TFolder, TItem> | undefined) {
+    this.setFolderId(folder?.model.id);
+  }
+
+  setFolderId(folderId: string | undefined) {
+    if (!folderId) {
+      this._folderId$.next(undefined);
+      this._itemId$.next(undefined);
+    }
+
+    const currentFolderId = latestValueFromOrDefault(this.folderId$);
+    if (folderId === currentFolderId) return;
+    this._folderId$.next(folderId);
+    this._itemId$.next(undefined);
+  }
+  //</editor-fold>
+
+
 
   folderActive$(folderId: string): Observable<boolean> {
     return this.baseFolder$.pipe(map(f => !!f && f.model.id === folderId))
