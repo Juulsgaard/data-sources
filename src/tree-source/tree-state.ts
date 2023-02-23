@@ -118,48 +118,50 @@ export class TreeState<TFolder extends WithId, TItem extends WithId> implements 
   }
 
   //<editor-fold desc="Set Item">
-  setItem(item: BaseTreeItem<TItem> | undefined) {
+  setItem(item: BaseTreeItem<TItem> | undefined): boolean {
     if (!item) {
       this._itemId$.next(undefined);
-      return;
+      return true;
     }
 
     this._folderId$.next(item.folderId);
     this._itemId$.next(item.model.id);
+    return true;
   }
 
-  async setItemId(itemId: string | undefined) {
+  async setItemId(itemId: string | undefined): Promise<boolean> {
     if (!itemId) {
       this._itemId$.next(undefined);
-      return;
+      return true;
     }
 
     const item = await firstValueFrom(this.dataSource.baseItemLookup$.pipe(
       map(lookup => lookup.get(itemId))
     ));
 
-    if (!item) return;
-    this.setItem(item);
+    if (!item) return false;
+    return this.setItem(item);
   }
 
   //</editor-fold>
 
   //<editor-fold desc="Set Folder">
-  setFolder(folder: BaseTreeFolder<TFolder> | TreeFolder<TFolder, TItem> | undefined) {
-    this.setFolderId(folder?.model.id);
+  setFolder(folder: BaseTreeFolder<TFolder> | TreeFolder<TFolder, TItem> | undefined): boolean {
+    return this.setFolderId(folder?.model.id);
   }
 
-  setFolderId(folderId: string | undefined) {
+  setFolderId(folderId: string | undefined): boolean {
     if (!folderId) {
       this._folderId$.next(undefined);
       this._itemId$.next(undefined);
-      return;
+      return true;
     }
 
-    if (this._folderId$.value === folderId) return;
+    if (this._folderId$.value === folderId) return false;
 
     this._folderId$.next(folderId);
     this._itemId$.next(undefined);
+    return true;
   }
 
   //</editor-fold>
@@ -271,38 +273,46 @@ export class TreeItemState<TFolder extends WithId, TItem extends WithId> impleme
   }
 
   //<editor-fold desc="Set Item">
-  setItem(item: BaseTreeItem<TItem> | undefined) {
-    this.setItemId(item?.model.id);
+  setItem(item: BaseTreeItem<TItem> | undefined): boolean {
+    return this.setItemId(item?.model.id);
   }
 
-  setItemId(itemId: string | undefined) {
+  setItemId(itemId: string | undefined): boolean {
     if (itemId) {
       this._itemId$.next(itemId);
-      return this._folderId$.next(undefined);
+      this._folderId$.next(undefined);
+      return true;
     }
 
     const currentFolderId = latestValueFromOrDefault(this.folderId$);
     this._itemId$.next(itemId);
     this._folderId$.next(currentFolderId);
+    return true;
   }
 
   //</editor-fold>
 
   //<editor-fold desc="Set Folder">
-  setFolder(folder: BaseTreeFolder<TFolder> | TreeFolder<TFolder, TItem> | undefined) {
-    this.setFolderId(folder?.model.id);
+  setFolder(folder: BaseTreeFolder<TFolder> | TreeFolder<TFolder, TItem> | undefined): boolean {
+    return this.setFolderId(folder?.model.id);
   }
 
-  setFolderId(folderId: string | undefined) {
+  setFolderId(folderId: string | undefined): boolean {
     if (!folderId) {
       this._folderId$.next(undefined);
       this._itemId$.next(undefined);
+      return true;
     }
 
     const currentFolderId = latestValueFromOrDefault(this.folderId$);
-    if (folderId === currentFolderId) return;
+    if (folderId === currentFolderId) return false;
     this._folderId$.next(folderId);
     this._itemId$.next(undefined);
+    return true;
+  }
+
+  setOnlyFolderId(folderId: string|undefined) {
+    this._folderId$.next(folderId);
   }
   //</editor-fold>
 
