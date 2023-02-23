@@ -5,7 +5,7 @@ import {
 import {distinctUntilChanged, filter, map, skip, switchMap} from "rxjs/operators";
 import {BaseTreeFolder, BaseTreeItem, TreeAsideData, TreeFolder, TreeItem} from "./tree-data";
 import {TreeDataSource} from "./tree-data-source";
-import {isString, WithId} from "@consensus-labs/ts-tools";
+import {WithId} from "@consensus-labs/ts-tools";
 import {cache, latestValueFromOrDefault} from "@consensus-labs/rxjs-tools";
 
 export class TreeState<TFolder extends WithId, TItem extends WithId> implements Subscribable<TItem | undefined> {
@@ -203,7 +203,7 @@ export class TreeItemState<TFolder extends WithId, TItem extends WithId> impleme
 
   asideData$: Observable<TreeAsideData<TFolder, TItem>>;
 
-  constructor(private dataSource: TreeDataSource<TFolder, TItem>, folderId$?: Observable<string | undefined>, itemId$?: Observable<string | undefined>) {
+  constructor(private dataSource: TreeDataSource<TFolder, TItem>, itemId$?: Observable<string | undefined>) {
 
     this.itemId$ = merge(this._itemId$, itemId$ ?? EMPTY).pipe(cache(), distinctUntilChanged());
 
