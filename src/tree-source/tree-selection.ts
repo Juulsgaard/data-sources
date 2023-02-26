@@ -41,16 +41,22 @@ export class TreeSelection<TFolder extends WithId, TItem extends WithId> impleme
     return this.item$.subscribe(observer);
   }
 
-  toggleItem(item: string | WithId, state?: boolean) {
+  /**
+   * Toggle the item in the selection
+   * @param item - The item to toggle
+   * @param state - A forced state (`true` = always add, `false` = always delete)
+   * @returns The applied change (`true` = item added, `false` = item removed, `undefined` = nothing changed)
+   */
+  toggleItem(item: string | WithId, state?: boolean): boolean|undefined {
     const id = isString(item) ? item : item?.id;
 
     if (this._itemId$.value === id) {
-      if (state === true) return false;
+      if (state === true) return undefined;
       this._itemId$.next(undefined);
-      return true;
+      return false;
     }
 
-    if (state === false) return false;
+    if (state === false) return undefined;
     this._itemId$.next(id);
     return true;
   }
@@ -101,9 +107,15 @@ export class TreeRange<TFolder extends WithId, TItem extends WithId> implements 
     return this.items$.subscribe(observer);
   }
 
-  toggleItem(item: string | WithId, state?: boolean) {
+  /**
+   * Toggle an item in the selection
+   * @param item - The item to toggle
+   * @param state - A forced state (`true` = always add, `false` = always delete)
+   * @returns The applied change (`true` = item added, `false` = item removed, `undefined` = nothing changed)
+   */
+  toggleItem(item: string | WithId, state?: boolean): boolean|undefined {
     const id = isString(item) ? item : item.id;
-    this._itemIds$.toggle(id, state);
+    return this._itemIds$.toggle(id, state);
   }
 
   setRange(list: string[] | WithId[]) {

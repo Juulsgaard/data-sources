@@ -19,17 +19,24 @@ export class ListSelection<TModel extends WithId> extends ListState<TModel> {
     this.setItem(undefined);
   }
 
-  toggleItem(item: string | WithId, state?: boolean) {
+  /**
+   * Toggle the item in the selection
+   * @param item - The item to toggle
+   * @param state - A forced state (`true` = always add, `false` = always delete)
+   * @returns The applied change (`true` = item added, `false` = item removed, `undefined` = nothing changed)
+   */
+  toggleItem(item: string | WithId, state?: boolean): boolean|undefined {
     const id = isString(item) ? item : item.id;
 
     if (this._itemId$.value === item) {
-      if (state === true) return;
+      if (state === true) return undefined;
       this.setItem(undefined);
-      return;
+      return false;
     }
 
-    if (state === false) return;
+    if (state === false) return undefined;
     this.setItem(id);
+    return true;
   }
 
   isActive$(folder: WithId | string) {
@@ -73,9 +80,15 @@ export class ListRange<TModel> implements Subscribable<TModel[]> {
     this._itemIds$.clear();
   }
 
-  toggleItem(item: string | WithId, state?: boolean) {
+  /**
+   * Toggle an item in the selection
+   * @param item - The item to toggle
+   * @param state - A forced state (`true` = always add, `false` = always delete)
+   * @returns The applied change (`true` = item added, `false` = item removed, `undefined` = nothing changed)
+   */
+  toggleItem(item: string | WithId, state?: boolean): boolean|undefined {
     const id = isString(item) ? item : item.id;
-    this._itemIds$.toggle(id, state);
+    return this._itemIds$.toggle(id, state);
   }
 
   isActive$(folder: WithId | string) {
