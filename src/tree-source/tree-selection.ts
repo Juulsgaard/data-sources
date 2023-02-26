@@ -2,7 +2,7 @@ import {isString, WithId} from "@consensus-labs/ts-tools";
 import {BehaviorSubject, Observable, Observer, of, shareReplay, Subscribable, Unsubscribable} from "rxjs";
 import {TreeDataSource} from "./tree-data-source";
 import {distinctUntilChanged, map, switchMap} from "rxjs/operators";
-import {cache} from "@consensus-labs/rxjs-tools";
+import {cache, ObservableSet} from "@consensus-labs/rxjs-tools";
 import {BaseTreeItem, TreeFolder} from "./tree-data";
 
 export class TreeSelection<TFolder extends WithId, TItem extends WithId> implements Subscribable<TItem | undefined> {
@@ -72,22 +72,16 @@ export class TreeRange<TFolder extends WithId, TItem extends WithId> implements 
 
   multiple: true = true;
 
-  private _itemIds$ = new BehaviorSubject<string[]>([]);
-  itemIds$: Observable<string[]>;
-  itemIdLookup$: Observable<Set<string>>;
+  private _itemIds$ = new ObservableSet<string>();
+  itemIds$ = this._itemIds$.value$;
+  itemIdArray$ = this._itemIds$.array$;
 
   items$: Observable<TItem[]>;
   empty$: Observable<boolean>;
 
   constructor(private dataSource: TreeDataSource<TFolder, TItem>) {
 
-    this.itemIds$ = this._itemIds$.asObservable();
-    this.itemIdLookup$ = this.itemIds$.pipe(
-      map(list => new Set<string>(list)),
-      cache()
-    );
-
-    const baseItems$ = this.itemIds$.pipe(
+    const baseItems$ = this.itemIdArray$.pipe(
       switchMap(ids => !ids.length ? of([]) : this.dataSource.baseItemLookup$.pipe(
         map(lookup => ids.map(x => lookup.get(x)).filter((x): x is BaseTreeItem<TItem> => !!x))
       )),
@@ -109,31 +103,20 @@ export class TreeRange<TFolder extends WithId, TItem extends WithId> implements 
 
   toggleItem(item: string | WithId, state?: boolean) {
     const id = isString(item) ? item : item.id;
-    const ids = this._itemIds$.value;
-    const index = ids.indexOf(id);
-
-    if (index < 0) {
-      if (state === false) return false;
-      this._itemIds$.next([...ids, id]);
-      return true;
-    }
-
-    if (state === true) return false;
-    const newIds = [...ids];
-    newIds.splice(index, 1);
-    this._itemIds$.next(newIds);
-    return true;
+    this._itemIds$.toggle(id, state);
   }
 
   setRange(list: string[] | WithId[]) {
-    this._itemIds$.next(list.map(x => isString(x) ? x : x.id));
+    this._itemIds$.set(list.map(x => isString(x) ? x : x.id));
+  }
+
+  clear() {
+    this._itemIds$.clear();
   }
 
   //<editor-fold desc="Toggle Entire Folder">
   toggleFolder(folder: TreeFolder<TFolder, TItem>, checked: boolean) {
-    const set = new Set(this._itemIds$.value);
-    this._toggleFolder(folder, checked, set);
-    this._itemIds$.next(Array.from(set));
+    this._itemIds$.modify(set => this._toggleFolder(folder, checked, set));
   }
 
   private _toggleFolder(folder: TreeFolder<TFolder, TItem>, checked: boolean, set: Set<string>) {
@@ -157,7 +140,7 @@ export class TreeRange<TFolder extends WithId, TItem extends WithId> implements 
   getFolderState$(folder: TreeFolder<TFolder, TItem>): [checked: Observable<boolean>, indeterminate: Observable<boolean>] {
     if (folder.itemCount < 1) return [of(false), of(false)];
 
-    const state$ = this.itemIdLookup$.pipe(
+    const state$ = this.itemIds$.pipe(
       map(lookup => {
         if (!lookup.size) return 'none';
         return this.getFolderState(lookup.size < folder.itemCount ? 'none' : undefined, folder, lookup);
@@ -171,7 +154,7 @@ export class TreeRange<TFolder extends WithId, TItem extends WithId> implements 
   private getFolderState(
     state: ActiveState | undefined,
     folder: TreeFolder<TFolder, TItem>,
-    lookup: Set<string>
+    lookup: ReadonlySet<string>
   ): ActiveState {
 
     const itemState = this.getFolderItemState(folder, lookup);
@@ -191,7 +174,7 @@ export class TreeRange<TFolder extends WithId, TItem extends WithId> implements 
     return state!;
   }
 
-  private getFolderItemState(folder: TreeFolder<TFolder, TItem>, lookup: Set<string>): ActiveState | undefined {
+  private getFolderItemState(folder: TreeFolder<TFolder, TItem>, lookup: ReadonlySet<string>): ActiveState | undefined {
     if (!folder.items.length) return undefined;
     let itemState: ActiveState | undefined;
 
@@ -215,7 +198,7 @@ export class TreeRange<TFolder extends WithId, TItem extends WithId> implements 
 
   isActive$(folder: WithId | string) {
     const id = isString(folder) ? folder : folder.id;
-    return this.itemIdLookup$.pipe(
+    return this.itemIds$.pipe(
       map(lookup => lookup.has(id))
     );
   }

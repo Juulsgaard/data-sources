@@ -1,7 +1,7 @@
 lockfileVersion: 5.4
 
 specifiers:
-  '@consensus-labs/rxjs-tools': 1.2.7
+  '@consensus-labs/rxjs-tools': 1.2.8
   '@consensus-labs/ts-tools': 1.3.7
   '@types/jest': ^29.2.6
   fuse.js: 6.6.2
@@ -14,7 +14,7 @@ specifiers:
   typescript: ~4.9.4
 
 devDependencies:
-  '@consensus-labs/rxjs-tools': 1.2.7_iucjssk6cbw76xbrqu7wzhvn6i
+  '@consensus-labs/rxjs-tools': 1.2.8_iucjssk6cbw76xbrqu7wzhvn6i
   '@consensus-labs/ts-tools': 1.3.7_typescript@4.9.4
   '@types/jest': 29.2.6
   fuse.js: 6.6.2
@@ -367,8 +367,8 @@ packages:
     resolution: {integrity: sha512-0hYQ8SB4Db5zvZB4axdMHGwEaQjkZzFjQiN9LVYvIFB2nSUHW9tYpxWriPrWDASIxiaXax83REcLxuSdnGPZtw==}
     dev: true
 
-  /@consensus-labs/rxjs-tools/1.2.7_iucjssk6cbw76xbrqu7wzhvn6i:
-    resolution: {integrity: sha1-te4s+DpMziZM4Pj78S4XENCfOQ0=, tarball: https://gitlab.com/api/v4/projects/38260126/packages/npm/@consensus-labs/rxjs-tools/-/@consensus-labs/rxjs-tools-1.2.7.tgz}
+  /@consensus-labs/rxjs-tools/1.2.8_iucjssk6cbw76xbrqu7wzhvn6i:
+    resolution: {integrity: sha1-oaIie5HC9OV9ijZvWibsMjIq6ss=, tarball: https://gitlab.com/api/v4/projects/38260126/packages/npm/@consensus-labs/rxjs-tools/-/@consensus-labs/rxjs-tools-1.2.8.tgz}
     peerDependencies:
       '@consensus-labs/ts-tools': ^1.3.2
       rxjs: ^7.8.0
