@@ -79,8 +79,12 @@ export class TreeRange<TFolder extends WithId, TItem extends WithId> implements 
   multiple: true = true;
 
   private _itemIds$ = new ObservableSet<string>();
+
   itemIds$ = this._itemIds$.value$;
+  get itemIds() {return this._itemIds$.value}
+
   itemIdArray$ = this._itemIds$.array$;
+  get itemIdArray() {return this._itemIds$.array};
 
   items$: Observable<TItem[]>;
   empty$: Observable<boolean>;
@@ -208,11 +212,16 @@ export class TreeRange<TFolder extends WithId, TItem extends WithId> implements 
 
   //</editor-fold>
 
-  isActive$(folder: WithId | string) {
-    const id = isString(folder) ? folder : folder.id;
+  isActive$(item: WithId | string) {
+    const id = isString(item) ? item : item.id;
     return this.itemIds$.pipe(
       map(lookup => lookup.has(id))
     );
+  }
+
+  contains(item: WithId | string) {
+    const id = isString(item) ? item : item.id;
+    return this.itemIds.has(id);
   }
 }
 

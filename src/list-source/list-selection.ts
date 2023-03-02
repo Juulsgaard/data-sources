@@ -51,8 +51,12 @@ export class ListSelection<TModel extends WithId> extends ListState<TModel> {
 export class ListRange<TModel> implements Subscribable<TModel[]> {
 
   private _itemIds$ = new ObservableSet<string>();
-  public itemIds$ = this._itemIds$.value$;
-  public itemIdArray$ = this._itemIds$.array$;
+
+  itemIds$ = this._itemIds$.value$;
+  get itemIds() {return this._itemIds$.value}
+
+  itemIdArray$ = this._itemIds$.array$;
+  get itemIdArray() {return this._itemIds$.array};
 
   public items$: Observable<TModel[]>;
 
@@ -96,6 +100,11 @@ export class ListRange<TModel> implements Subscribable<TModel[]> {
     return this.itemIds$.pipe(
       map(lookup => lookup.has(id))
     );
+  }
+
+  contains(item: WithId | string) {
+    const id = isString(item) ? item : item.id;
+    return this.itemIds.has(id);
   }
 
 }
