@@ -608,7 +608,7 @@ export class ListDataSource<TModel extends WithId> {
   }
 
   private _length$ = new BehaviorSubject(0);
-  private length$ = this._length$.asObservable();
+  readonly length$ = this._length$.asObservable();
   get length() {
     return this._length$.value
   }
