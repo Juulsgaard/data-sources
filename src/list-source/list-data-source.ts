@@ -200,7 +200,8 @@ export class ListDataSource<TModel extends WithId> {
 
     // Sorting
     const sorted$ = combineLatest([filtered$, this.sorting$]).pipe(
-      map(([list, sort]) => this.sort(list, sort))
+      map(([list, sort]) => this.sort(list, sort)),
+      cache()
     );
 
     // Pagination
@@ -209,6 +210,8 @@ export class ListDataSource<TModel extends WithId> {
     )
 
     // Outputs
+    this.filteredItemList$ = sorted$;
+
     this.simpleData$ = paginated$.pipe(
       map(x => this.mapToUniversal(x)),
       cache()
@@ -250,6 +253,7 @@ export class ListDataSource<TModel extends WithId> {
   private readonly _recalculate$ = new BehaviorSubject<void>(undefined);
 
   public readonly itemList$: Observable<TModel[]>;
+  public readonly filteredItemList$: Observable<TModel[]>;
   public readonly empty$: Observable<boolean>;
 
   /**
