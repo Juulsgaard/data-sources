@@ -1,4 +1,4 @@
-import {asyncScheduler, BehaviorSubject, debounceTime, EMPTY, Observable, Subscription} from "rxjs";
+import {asyncScheduler, BehaviorSubject, debounceTime, EMPTY, Observable, startWith, Subscription} from "rxjs";
 import {catchError, distinctUntilChanged, map, skip, throttleTime} from "rxjs/operators";
 import {BaseTreeFolder, BaseTreeItem} from "../tree-source/tree-data";
 import {deepCopy} from "@consensus-labs/ts-tools";
@@ -56,12 +56,16 @@ export abstract class FilterService<TFilter, TModel> {
 
     this.activeFilters$ = this.state$.pipe(
       debounceTime(200),
+      startWith(this.state),
+      distinctUntilChanged(),
       map(state => this._filters.reduce((acc, x) => x.isActive(state) ? acc + 1 : acc, 0)),
       cache()
     );
 
     this.filter$ = this.state$.pipe(
       debounceTime(500),
+      startWith(this.state),
+      distinctUntilChanged(),
       map(state => new FilterServiceState<TFilter, TModel>(state, this._filters)),
       cache()
     );

@@ -107,7 +107,8 @@ export class ListDataSource<TModel extends WithId> {
       this.columnIds.push('_flags');
     }
 
-    this.page$ = new BehaviorSubject<Pagination>({page: 0, pageSize: options.pageSize});
+    this._page$ = new BehaviorSubject<Pagination>({page: 0, pageSize: options.pageSize});
+    this.page$ = this._page$.asObservable();
 
     this.filter$ = this.options.filterService?.filter$ ?? of(undefined)
     //</editor-fold>
@@ -203,7 +204,7 @@ export class ListDataSource<TModel extends WithId> {
     );
 
     // Pagination
-    const paginated$ = combineLatest([sorted$, this.page$]).pipe(
+    const paginated$ = combineLatest([sorted$, this._page$]).pipe(
       map(([list, page]) => this.paginate(list, page))
     )
 
@@ -596,18 +597,20 @@ export class ListDataSource<TModel extends WithId> {
   //</editor-fold>
 
   //<editor-fold desc="Pagination">
-  private page$: BehaviorSubject<Pagination>;
+  private _page$: BehaviorSubject<Pagination>;
+  readonly page$: Observable<Pagination>;
 
   /**
    * The current pagination page
    */
   get page() {
-    return this.page$.value
+    return this._page$.value
   }
 
-  private _length = 0;
+  private _length$ = new BehaviorSubject(0);
+  private length$ = this._length$.asObservable();
   get length() {
-    return this._length
+    return this._length$.value
   }
 
   /**
@@ -616,11 +619,11 @@ export class ListDataSource<TModel extends WithId> {
    * @private
    */
   private updatePage(listLength: number) {
-    this._length = listLength;
-    const page = this.page$.value;
+    this._length$.next(listLength);
+    const page = this._page$.value;
     if (listLength == 0 || listLength > page.page * page.pageSize) return;
 
-    this.page$.next({pageSize: page.pageSize, page: Math.floor((listLength - 1) / page.pageSize)});
+    this._page$.next({pageSize: page.pageSize, page: Math.floor((listLength - 1) / page.pageSize)});
   }
 
   /**
@@ -640,7 +643,7 @@ export class ListDataSource<TModel extends WithId> {
    * @param pageIndex
    */
   public setPage({pageSize, pageIndex}: Page) {
-    this.page$.next({page: pageIndex, pageSize});
+    this._page$.next({page: pageIndex, pageSize});
   }
 
   //</editor-fold>
