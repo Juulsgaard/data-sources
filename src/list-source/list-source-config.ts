@@ -77,6 +77,11 @@ export interface IListDataSourceConfig<TModel extends WithId> {
   hasIndexSorting(): this;
 
   /**
+   * Use pure mapping if bindings are pure
+   */
+  isPure(): this;
+
+  /**
    * Add pagination to the data source
    * @param pageSize
    */
@@ -110,6 +115,7 @@ export class ListDataSourceConfig<TModel extends WithId> implements IListDataSou
   listConfig?: ListDataConfig<TModel>;
   gridConfig?: GridDataConfig<TModel>;
   options: ListDataSourceOptions<TModel> = {
+    pureMapping: false,
     paginated: false,
     pageSize: 40,
     actions: [],
@@ -177,6 +183,11 @@ export class ListDataSourceConfig<TModel extends WithId> implements IListDataSou
 
   hasIndexSorting() {
     this.options.indexSorted = true;
+    return this;
+  }
+
+  isPure() {
+    this.options.pureMapping = true;
     return this;
   }
 

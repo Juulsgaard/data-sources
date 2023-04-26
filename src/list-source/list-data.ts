@@ -164,6 +164,7 @@ export interface ListActionOptions<TModel> {
  * The base configuration for ListDataSource
  */
 export interface ListDataSourceOptions<TModel> {
+    pureMapping: boolean;
     paginated: boolean;
     pageSize: number;
     filterService?: FilterService<any, TModel>;

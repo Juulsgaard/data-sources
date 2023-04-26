@@ -10,7 +10,7 @@ import {ISorted, sortByIndexAsc} from "../lib/index-sort";
 import {DetachedSearchData} from "../models/detached-search";
 import {applyQueryParam, arrToMap, mapArr, mapToArr, SimpleObject, SortFn, WithId} from "@consensus-labs/ts-tools";
 import {Page, Sort} from "../lib/types";
-import {cache} from "@consensus-labs/rxjs-tools";
+import {cache, mapListChanged} from "@consensus-labs/rxjs-tools";
 import FuseResult = Fuse.FuseResult;
 
 export class ListDataSource<TModel extends WithId> {
@@ -164,7 +164,7 @@ export class ListDataSource<TModel extends WithId> {
 
     // Setup search
     this.preSearchData$ = filtered$.pipe(
-      map(list => this.mapToSearch(list)),
+      mapListChanged(this.mapToSearch.bind(this), this.options.pureMapping),
       tap(list => this.setupSearch(list)),
       cache()
     );
@@ -178,23 +178,32 @@ export class ListDataSource<TModel extends WithId> {
       map(list => list.map(x => x.item.model))
     );
 
+    const listMap = this.listConfig
+      ? mapListChanged(this.mapToList.bind(this), this.options.pureMapping)
+      : map(() => []);
+
+    const gridMap = this.gridConfig
+      ? mapListChanged(this.mapToGrid.bind(this), this.options.pureMapping)
+      : map(() => []);
+
+    // Search output
     this.simpleSearchData$ = searchData$.pipe(
-      map(x => this.mapToUniversal(x)),
+      mapListChanged(this.mapToUniversal.bind(this), this.options.pureMapping),
       cache()
     );
 
     this.tableSearchData$ = this.simpleSearchData$.pipe(
-      map(x => this.mapToTable(x)),
+      mapListChanged(this.mapToTable.bind(this), this.options.pureMapping),
       cache(),
     );
 
     this.listSearchData$ = this.simpleSearchData$.pipe(
-      map(x => this.mapToList(x)),
+      listMap,
       cache(),
     );
 
     this.gridSearchData$ = this.simpleSearchData$.pipe(
-      map(x => this.mapToGrid(x)),
+      gridMap,
       cache()
     );
 
@@ -213,22 +222,22 @@ export class ListDataSource<TModel extends WithId> {
     this.filteredItemList$ = sorted$;
 
     this.simpleData$ = paginated$.pipe(
-      map(x => this.mapToUniversal(x)),
+      mapListChanged(this.mapToUniversal.bind(this), this.options.pureMapping),
       cache()
     );
 
     this.tableData$ = this.simpleData$.pipe(
-      map(x => this.mapToTable(x)),
+      mapListChanged(this.mapToTable.bind(this), this.options.pureMapping),
       cache(),
     );
 
     this.listData$ = this.simpleData$.pipe(
-      map(x => this.mapToList(x)),
+      listMap,
       cache(),
     );
 
     this.gridData$ = this.simpleData$.pipe(
-      map(x => this.mapToGrid(x)),
+      gridMap,
       cache()
     );
 
@@ -318,43 +327,37 @@ export class ListDataSource<TModel extends WithId> {
   //</editor-fold>
 
   //<editor-fold desc="Map To Universal">
-  mapToUniversal(list: TModel[]): ListUniversalData<TModel>[] {
-    return list.map((row): ListUniversalData<TModel> => {
+  mapToUniversal(row: TModel): ListUniversalData<TModel> {
+    const actions = mapArr(this.options.actions, action => this.mapAction(row, action));
 
-      const actions = mapArr(this.options.actions, action => this.mapAction(row, action));
-
-      const flags = mapArr(this.options.flags, f => {
-        const active = f.filter(row);
-        const icon = active ? f.icon : f.inactiveIcon;
-        const name = active ? f.name : f.inactiveName ?? f.name;
-        return icon ? {icon, name} as ListFlag : null;
-      });
-
-      return {model: row, actions, flags};
+    const flags = mapArr(this.options.flags, f => {
+      const active = f.filter(row);
+      const icon = active ? f.icon : f.inactiveIcon;
+      const name = active ? f.name : f.inactiveName ?? f.name;
+      return icon ? {icon, name} as ListFlag : null;
     });
+
+    return {model: row, actions, flags};
   }
   //</editor-fold>
 
   //<editor-fold desc="Map to Table">
   /**
    * Map the raw data to a table format with data as defined by the config
-   * @param list - The raw data
+   * @param row - The raw data
    * @private
    */
-  private mapToTable(list: ListUniversalData<TModel>[]): TableData<TModel>[] {
-    return list.map(row => {
-
-      const data = {} as SimpleObject;
-      this.tableColumns.forEach(col => {
-        data[col.id] = col.mapData(row.model);
-      });
-
-      return {
-        ...row,
-        id: row.model.id,
-        data
-      };
+  private mapToTable(row: ListUniversalData<TModel>): TableData<TModel> {
+    const data = {} as SimpleObject;
+    this.tableColumns.forEach(col => {
+      data[col.id] = col.mapData(row.model);
     });
+
+    return {
+      ...row,
+      id: row.model.id,
+      data
+    };
   }
 
   //</editor-fold>
@@ -368,26 +371,24 @@ export class ListDataSource<TModel extends WithId> {
   searching$: Observable<boolean>;
 
   /**
-   * Add a search map to models
-   * @param list - List of models
+   * Add a search map to model
+   * @param row - data model
    */
-  mapToSearch(list: TModel[]): ListSearchData<TModel>[] {
-    return list.map(row => {
-      const search: Record<string, string> = {};
+  mapToSearch(row: TModel): ListSearchData<TModel> {
+    const search: Record<string, string> = {};
 
-      for (let [id, col] of this.tableColumns) {
-        if (!col.searchable) continue;
-        const val = col.mapData(row)?.toString();
-        if (val !== undefined) search[id] = val;
-      }
+    for (let [id, col] of this.tableColumns) {
+      if (!col.searchable) continue;
+      const val = col.mapData(row)?.toString();
+      if (val !== undefined) search[id] = val;
+    }
 
-      for (let [id, col] of this.searchColumns) {
-        const val = col.mapData(row);
-        if (val !== undefined) search[id] = val;
-      }
+    for (let [id, col] of this.searchColumns) {
+      const val = col.mapData(row);
+      if (val !== undefined) search[id] = val;
+    }
 
-      return {model: row, search};
-    });
+    return {model: row, search};
   }
 
   /**
@@ -515,24 +516,20 @@ export class ListDataSource<TModel extends WithId> {
   //<editor-fold desc="Map to List">
   /**
    * Map the table data to the more compact List data
-   * @param list - Table data
+   * @param item - Row data
    * @private
    */
-  private mapToList(list: ListUniversalData<TModel>[]): ListData<TModel>[] {
-    if (!this.listConfig) return [];
-
-    return list.map(item => {
-      const icon = this.listConfig!.icon?.(item.model);
-      return {
-        ...item,
-        id: item.model.id,
-        firstLine: this.listConfig!.firstLine(item.model),
-        secondLine: this.listConfig!.secondLine?.(item.model),
-        avatar: this.getImageUrl(item.model, !icon ? this.listConfig!.avatarPlaceholder : undefined, this.listConfig!.avatar, this.listConfig!.avatarCacheBuster),
-        icon: icon,
-        cssClasses: this.listConfig!.styles.filter(style => style.condition(item.model)).map(x => x.cssClass)
-      }
-    });
+  private mapToList(item: ListUniversalData<TModel>): ListData<TModel> {
+    const icon = this.listConfig!.icon?.(item.model);
+    return {
+      ...item,
+      id: item.model.id,
+      firstLine: this.listConfig!.firstLine(item.model),
+      secondLine: this.listConfig!.secondLine?.(item.model),
+      avatar: this.getImageUrl(item.model, !icon ? this.listConfig!.avatarPlaceholder : undefined, this.listConfig!.avatar, this.listConfig!.avatarCacheBuster),
+      icon: icon,
+      cssClasses: this.listConfig!.styles.filter(style => style.condition(item.model)).map(x => x.cssClass)
+    }
   }
 
   //</editor-fold>
@@ -540,26 +537,20 @@ export class ListDataSource<TModel extends WithId> {
   //<editor-fold desc="Map to Grid">
   /**
    * Map the table data to the re-orderable grid data
-   * @param list - Table data
-   * @private
+   * @param item
    */
-  private mapToGrid(list: ListUniversalData<TModel>[]): GridData<TModel>[] {
-    if (!this.gridConfig) return [];
+  private mapToGrid(item: ListUniversalData<TModel>): GridData<TModel> {
+    const icon = this.gridConfig!.icon?.(item.model);
 
-    return list.map(item => {
-
-      const icon = this.gridConfig!.icon?.(item.model);
-
-      return {
-        ...item,
-        id: item.model.id,
-        title: this.gridConfig!.title(item.model),
-        subTitle: this.gridConfig!.subTitle?.(item.model),
-        image: this.getImageUrl(item.model, !icon ? this.gridConfig!.imagePlaceholder : undefined, this.gridConfig!.image, this.gridConfig!.imageCacheBuster),
-        icon: icon,
-        index: (item.model as Partial<ISorted>).index
-      }
-    });
+    return {
+      ...item,
+      id: item.model.id,
+      title: this.gridConfig!.title(item.model),
+      subTitle: this.gridConfig!.subTitle?.(item.model),
+      image: this.getImageUrl(item.model, !icon ? this.gridConfig!.imagePlaceholder : undefined, this.gridConfig!.image, this.gridConfig!.imageCacheBuster),
+      icon: icon,
+      index: (item.model as Partial<ISorted>).index
+    }
   }
 
   //</editor-fold>
