@@ -134,7 +134,7 @@ export interface ListFlag {
 /**
  * A config defining an action relating to a List Item
  */
-export interface ListActionConfig<TModel> extends ListActionOptions<TModel> {
+export interface ListActionConfig<TModel> extends ListNavigationOptions<TModel> {
     name: string;
     icon: string;
     action?: (data: TModel) => any;
@@ -146,6 +146,7 @@ export interface ListAction<TModel> {
     icon: string;
     color?: ThemeColor;
     action?: (data: TModel) => any;
+    newTab?: boolean;
     route?: string[];
 }
 
@@ -157,6 +158,13 @@ export interface ListActionOptions<TModel> {
     filter?: (data: TModel) => boolean;
     /** An optional color for the button */
     color?: ThemeColor;
+}
+
+/**
+ * Optional configs for ListNavigationConfig
+ */
+export interface ListNavigationOptions<TModel> extends ListActionOptions<TModel> {
+    newTab?: boolean;
 }
 //</editor-fold>
 

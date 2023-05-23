@@ -4,7 +4,7 @@ import {
 import {FilterService} from "../filtering/filter-service";
 import {
   GridDataConfig, HiddenSearchColumn, HiddenSortColumn, ListActionOptions, ListDataConfig, ListDataSourceOptions,
-  TableColumn, TableColumnOptions
+  ListNavigationOptions, TableColumn, TableColumnOptions
 } from "./list-data";
 import {ListDataSource} from "./list-data-source";
 import {getRenderDataTypeSorting, getSortingTypeSorting} from "../lib/sorting";
@@ -69,7 +69,7 @@ export interface IListDataSourceConfig<TModel extends WithId> {
    * @param route - Define the mapping for the route to use
    * @param options - Options for configuring the action
    */
-  addNavigation(name: string, icon: string, route: (data: TModel) => string[], options?: ListActionOptions<TModel>): this;
+  addNavigation(name: string, icon: string, route: (data: TModel) => string[], options?: ListNavigationOptions<TModel>): this;
 
   /**
    * Sort the list by an index property
@@ -171,7 +171,7 @@ export class ListDataSourceConfig<TModel extends WithId> implements IListDataSou
     return this;
   }
 
-  addNavigation(name: string, icon: string, route: (data: TModel) => string[], options?: ListActionOptions<TModel>) {
+  addNavigation(name: string, icon: string, route: (data: TModel) => string[], options?: ListNavigationOptions<TModel>) {
     this.options.actions.push({
       name,
       icon,

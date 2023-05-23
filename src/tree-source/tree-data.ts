@@ -299,7 +299,7 @@ export interface TreePathData<TFolder, TItem> {
 /**
  * A config defining an action relating to a Folder
  */
-export interface TreeFolderActionConfig<TFolder, TItem> extends TreeFolderActionOptions<TFolder, TItem> {
+export interface TreeFolderActionConfig<TFolder, TItem> extends TreeFolderNavigationOptions<TFolder, TItem> {
   name: string;
   icon: string;
   action?: TreeFolderMap<TFolder, TItem, any>;
@@ -311,6 +311,7 @@ export interface TreeFolderAction<TFolder, TItem> {
   icon: string;
   action?: TreeFolderMap<TFolder, TItem, any>;
   route?: string[];
+  newTab?: boolean;
   color?: ThemeColor;
 }
 
@@ -325,9 +326,16 @@ export interface TreeFolderActionOptions<TFolder, TItem> {
 }
 
 /**
+ * Optional config for TreeFolderNavigationConfig
+ */
+export interface TreeFolderNavigationOptions<TFolder, TItem> extends TreeFolderActionOptions<TFolder, TItem> {
+  newTab?: boolean;
+}
+
+/**
  * A config defining an action relating to an Item
  */
-export interface TreeItemActionConfig<TFolder, TItem> extends TreeItemActionOptions<TFolder, TItem> {
+export interface TreeItemActionConfig<TFolder, TItem> extends TreeItemNavigationOptions<TFolder, TItem> {
   name: string;
   icon: string;
   action?: TreeItemMap<TFolder, TItem, any>;
@@ -339,6 +347,7 @@ export interface TreeItemAction<TFolder, TItem> {
   icon: string;
   action?: TreeItemMap<TFolder, TItem, any>;
   route?: string[];
+  newTab?: boolean;
   color?: ThemeColor;
 }
 
@@ -350,6 +359,13 @@ export interface TreeItemActionOptions<TFolder, TItem> {
   filter?: TreeItemMap<TFolder, TItem, boolean>;
   /** An optional color for the button */
   color?: ThemeColor;
+}
+
+/**
+ * Optional config for TreeItemNavigationConfig
+ */
+export interface TreeItemNavigationOptions<TFolder, TItem> extends TreeItemActionOptions<TFolder, TItem> {
+  newTab?: boolean;
 }
 
 //</editor-fold>

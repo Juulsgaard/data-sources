@@ -1,7 +1,7 @@
 import {
-  TreeDataSourceOptions, TreeFolderActionOptions, TreeFolderMap, TreeHiddenSearchColumnConfig,
-  TreeHiddenSortColumnConfig, TreeItemActionOptions, TreeItemMap, TreeMoveActions, TreeRowConfig,
-  TreeSearchColumnConfig, TreeSortConfig
+  TreeDataSourceOptions, TreeFolderActionOptions, TreeFolderMap, TreeFolderNavigationOptions,
+  TreeHiddenSearchColumnConfig, TreeHiddenSortColumnConfig, TreeItemActionOptions, TreeItemMap,
+  TreeItemNavigationOptions, TreeMoveActions, TreeRowConfig, TreeSearchColumnConfig, TreeSortConfig
 } from "./tree-data";
 import {
   RenderDataTypes, RenderDataValueType, RenderValueDataType, SortingTypes, SortingValueType
@@ -115,7 +115,7 @@ export class TreeDataOptionConfig<TFolder extends WithId, TItem extends WithId> 
    * @param route - A generator for the route to use for navigation
    * @param options - Options to configure the action
    */
-  addFolderNavigation(name: string, icon: string, route: TreeFolderMap<TFolder, TItem, string[]>, options?: TreeFolderActionOptions<TFolder, TItem>) {
+  addFolderNavigation(name: string, icon: string, route: TreeFolderMap<TFolder, TItem, string[]>, options?: TreeFolderNavigationOptions<TFolder, TItem>) {
     this.options.folderActions.push({
       name,
       icon,
@@ -149,7 +149,7 @@ export class TreeDataOptionConfig<TFolder extends WithId, TItem extends WithId> 
    * @param route - A generator for the route to use for navigation
    * @param options - Options to configure the action
    */
-  addItemNavigation(name: string, icon: string, route: TreeItemMap<TFolder, TItem, string[]>, options?: TreeItemActionOptions<TFolder, TItem>) {
+  addItemNavigation(name: string, icon: string, route: TreeItemMap<TFolder, TItem, string[]>, options?: TreeItemNavigationOptions<TFolder, TItem>) {
     this.options.itemActions.push({
       name,
       icon,

@@ -629,7 +629,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
           return config as TreeFolderAction<TFolder, TItem>;
         }
 
-        return {name: config.name, icon: config.icon, color: config.color, route: config.route(folder.model, folder)};
+        return {name: config.name, icon: config.icon, color: config.color, newTab: !!config.newTab, route: config.route(folder.model, folder)};
       }
     );
   }
@@ -645,7 +645,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
           return config as TreeItemAction<TFolder, TItem>;
         }
 
-        return {name: config.name, icon: config.icon, color: config.color, route: config.route(folder.model, folder)};
+        return {name: config.name, icon: config.icon, color: config.color, newTab: !!config.newTab, route: config.route(folder.model, folder)};
       }
     );
   }

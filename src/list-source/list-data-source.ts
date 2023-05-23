@@ -587,7 +587,7 @@ export class ListDataSource<TModel extends WithId> {
       return config as ListAction<TModel>;
     }
 
-    return {name: config.name, icon: config.icon, color: config.color, route: config.route(data)};
+    return {name: config.name, icon: config.icon, color: config.color, newTab: !!config.newTab, route: config.route(data)};
   }
   //</editor-fold>
 
