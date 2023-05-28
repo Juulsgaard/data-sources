@@ -1,7 +1,9 @@
 import {isString, WithId} from "@consensus-labs/ts-tools";
-import {combineLatest, Observable, Observer, Subscribable, Unsubscribable} from "rxjs";
+import {
+  asyncScheduler, combineLatest, combineLatestWith, Observable, Observer, Subscribable, Unsubscribable
+} from "rxjs";
 import {ListDataSource} from "./list-data-source";
-import {distinctUntilChanged, map} from "rxjs/operators";
+import {distinctUntilChanged, map, throttleTime} from "rxjs/operators";
 import {cache, ObservableSet} from "@consensus-labs/rxjs-tools";
 import {ListState} from "./list-state";
 
@@ -48,7 +50,7 @@ export class ListSelection<TModel extends WithId> extends ListState<TModel> {
 
 }
 
-export class ListRange<TModel> implements Subscribable<TModel[]> {
+export class ListRange<TModel extends WithId> implements Subscribable<TModel[]> {
 
   private _itemIds$ = new ObservableSet<string>();
 
@@ -62,14 +64,34 @@ export class ListRange<TModel> implements Subscribable<TModel[]> {
 
   public empty$: Observable<boolean>;
 
-  constructor(lookup$: Observable<Map<string, TModel>>) {
+  readonly selectAllState$: Observable<ActiveState>;
+  readonly allSelected$: Observable<boolean>;
+  readonly someSelected$: Observable<boolean>;
 
-    this.items$ = combineLatest([lookup$, this.itemIdArray$.pipe(distinctUntilChanged())]).pipe(
+  constructor(dataSource: ListDataSource<TModel>) {
+
+    this.items$ = combineLatest([dataSource.itemLookup$, this.itemIdArray$.pipe(distinctUntilChanged())]).pipe(
       map(([lookup, ids]) => ids.map(id => lookup.get(id)!).filter(x => !!x)),
       cache()
     );
 
     this.empty$ = this.items$.pipe(map(x => !x.length));
+
+    this.selectAllState$ = dataSource.itemList$.pipe(
+      combineLatestWith(this.itemIds$),
+      throttleTime(500, asyncScheduler, {leading: true, trailing: true}),
+      map(([items, selected]) => {
+        if (selected.size < 1) return 'none';
+        if (selected.size < items.length) return items.some(x => selected.has(x.id)) ? 'some' : 'none';
+        if (items.every(x => selected.has(x.id))) return 'all';
+        return 'some';
+      }),
+      distinctUntilChanged(),
+      cache()
+    );
+
+    this.allSelected$ = this.selectAllState$.pipe(map(x => x === 'all'));
+    this.someSelected$ = this.selectAllState$.pipe(map(x => x === 'some'));
   }
 
   subscribe(observer: Partial<Observer<TModel[]>>): Unsubscribable {
@@ -112,3 +134,5 @@ export class ListRange<TModel> implements Subscribable<TModel[]> {
 export type AnyListSelection<TModel extends WithId> =
   | ListSelection<TModel>
   | ListRange<TModel>;
+
+type ActiveState = 'none' | 'some' | 'all';
