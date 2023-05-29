@@ -10,7 +10,7 @@ import {ISorted, sortByIndexAsc} from "../lib/index-sort";
 import {DetachedSearchData} from "../models/detached-search";
 import {applyQueryParam, arrToMap, mapArr, mapToArr, SimpleObject, SortFn, WithId} from "@consensus-labs/ts-tools";
 import {Page, Sort} from "../lib/types";
-import {cache, mapListChanged} from "@consensus-labs/rxjs-tools";
+import {cache, mapListChanged, persistentCache} from "@consensus-labs/rxjs-tools";
 import FuseResult = Fuse.FuseResult;
 
 export class ListDataSource<TModel extends WithId> {
@@ -189,7 +189,7 @@ export class ListDataSource<TModel extends WithId> {
     // Search output
     this.simpleSearchData$ = searchData$.pipe(
       mapListChanged(this.mapToUniversal.bind(this), this.options.pureMapping),
-      cache()
+      persistentCache(500)
     );
 
     this.tableSearchData$ = this.simpleSearchData$.pipe(
@@ -223,7 +223,7 @@ export class ListDataSource<TModel extends WithId> {
 
     this.simpleData$ = paginated$.pipe(
       mapListChanged(this.mapToUniversal.bind(this), this.options.pureMapping),
-      cache()
+      persistentCache(500)
     );
 
     this.tableData$ = this.simpleData$.pipe(

@@ -12,7 +12,7 @@ import {
 } from "./tree-data";
 import {ITreeFolderFilterState, ITreeItemFilterState} from "../filtering/filter-service";
 import {BulkRelocateModel, MoveModel} from "../models/move";
-import {cache} from "@consensus-labs/rxjs-tools";
+import {cache, persistentCache} from "@consensus-labs/rxjs-tools";
 import {DetachedSearchData} from "../models/detached-search";
 import {
   applySelector, arrToLookup, arrToMap, mapArr, mapToArr, SimpleObject, SortFn, titleCase, WithId
@@ -289,7 +289,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
     this.filteredFolderLookup$ = filteredNestedData$.pipe(
       map(x => x.folders),
       map(folders => arrToMap(folders, x => x.model.id, x => x)),
-      cache()
+      persistentCache(500)
     );
 
 
