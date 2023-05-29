@@ -1,4 +1,4 @@
-import {FilterService} from "../filtering/filter-service";
+import {IFilterService} from "../filtering/filter-service";
 import {ThemeColor} from "../lib/types";
 import {MapFunc, SortFn} from "@consensus-labs/ts-tools";
 import {RenderValueDataType, SortableValueTypes} from "../models/render-types";
@@ -175,7 +175,7 @@ export interface ListDataSourceOptions<TModel> {
     pureMapping: boolean;
     paginated: boolean;
     pageSize: number;
-    filterService?: FilterService<any, TModel>;
+    filterService?: IFilterService<TModel>;
     actions: ListActionConfig<TModel>[];
     flags: ListFlagConfig<TModel>[];
     indexSorted: boolean;

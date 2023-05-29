@@ -1,4 +1,4 @@
-import {TreeFolderFilterService, TreeItemFilterService} from "../filtering/filter-service";
+import {ITreeFolderFilterService, ITreeItemFilterService} from "../filtering/filter-service";
 import {RenderValueDataType} from "../models/render-types";
 import {BulkRelocateModel, MoveModel} from "../models/move";
 import {Selection, SortFn} from "@consensus-labs/ts-tools";
@@ -143,8 +143,8 @@ export interface TreeDataSourceOptions<TFolder, TItem> {
   folderChildren?: Selection<TFolder, TItem[]>;
   folderParentId?: Selection<TFolder, string|undefined>;
 
-  folderFilterService?: TreeFolderFilterService<unknown, TFolder>;
-  itemFilterService?: TreeItemFilterService<unknown, TItem>;
+  folderFilterService?: ITreeFolderFilterService<TFolder>;
+  itemFilterService?: ITreeItemFilterService<TItem>;
 
   folderSort?: SortFn<TFolder>;
   itemSort?: SortFn<TItem>;

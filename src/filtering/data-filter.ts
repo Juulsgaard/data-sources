@@ -1,7 +1,6 @@
-
 export class DataFilter<TFilter, TModel> {
   constructor(
-    private readonly _filter: (list: TModel[], filter: TFilter) => TModel[],
+    private readonly _filter: <T extends TModel>(list: T[], filter: TFilter) => T[],
     private readonly _isActive: (filter: TFilter) => boolean
   ) {
 
@@ -11,7 +10,7 @@ export class DataFilter<TFilter, TModel> {
     return this._isActive(filter)
   }
 
-  filter(filter: TFilter, list: TModel[]) {
+  filter<T extends TModel>(filter: TFilter, list: T[]): T[] {
     if (!this.isActive(filter)) return list;
     return this._filter(list, filter);
   }

@@ -6,7 +6,11 @@ import {FilterAdapter, FilterReadState, FilterSaveState, MappedReadState} from "
 import {DataFilter, IndividualDataFilter} from "./data-filter";
 import {cache} from "@consensus-labs/rxjs-tools";
 
-export class FilterServiceState<TFilter, TModel> {
+export interface IFilterServiceState<TModel> {
+  filter<T extends TModel>(list: T[]): T[];
+}
+
+export class FilterServiceState<TFilter, TModel> implements IFilterServiceState<TModel> {
 
   private readonly filterState: TFilter;
 
@@ -14,7 +18,7 @@ export class FilterServiceState<TFilter, TModel> {
     this.filterState = deepCopy(filterState);
   }
 
-  filter(list: TModel[]) {
+  filter<T extends TModel>(list: T[]): T[] {
     for (let f of this.filters) {
       list = f.filter(this.filterState, list);
     }
@@ -22,10 +26,17 @@ export class FilterServiceState<TFilter, TModel> {
   }
 }
 
+export type ITreeFolderFilterState<TFolder> = IFilterServiceState<BaseTreeFolder<TFolder>>;
 export type TreeFolderFilterState<TFilter, TFolder> = FilterServiceState<TFilter, BaseTreeFolder<TFolder>>;
+export type ITreeItemFilterState<TItem> = IFilterServiceState<BaseTreeItem<TItem>>;
 export type TreeItemFilterState<TFilter, TItem> = FilterServiceState<TFilter, BaseTreeItem<TItem>>;
 
-export abstract class FilterService<TFilter, TModel> {
+export interface IFilterService<TModel> {
+  activeFilters$: Observable<number>;
+  filter$: Observable<IFilterServiceState<TModel>>;
+}
+
+export abstract class FilterService<TFilter, TModel> implements IFilterService<TModel> {
 
   private _filters: DataFilter<TFilter, TModel>[] = [];
 
@@ -71,7 +82,7 @@ export abstract class FilterService<TFilter, TModel> {
     );
   }
 
-  protected addFullFilter(isActive: (filter: TFilter) => boolean, filter: (list: TModel[], filter: TFilter) => TModel[]) {
+  protected addFullFilter(isActive: (filter: TFilter) => boolean, filter: <T extends TModel>(list: T[], filter: TFilter) => T[]) {
     this._filters.push(new DataFilter<TFilter, TModel>(filter, isActive));
   }
 
@@ -136,9 +147,13 @@ export abstract class FilterService<TFilter, TModel> {
   }
 }
 
+export type ITreeFolderFilterService<TFolder> = IFilterService<BaseTreeFolder<TFolder>>;
+
 export class TreeFolderFilterService<TFilter, TFolder> extends FilterService<TFilter, BaseTreeFolder<TFolder>> {
 
 }
+
+export type ITreeItemFilterService<TItem> = IFilterService<BaseTreeItem<TItem>>;
 
 export class TreeItemFilterService<TFilter, TItem> extends FilterService<TFilter, BaseTreeItem<TItem>> {
 

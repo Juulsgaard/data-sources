@@ -1,7 +1,7 @@
 import {asyncScheduler, BehaviorSubject, combineLatest, merge, Observable, of, ReplaySubject, startWith} from "rxjs";
 import {catchError, distinctUntilChanged, map, switchMap, tap, throttleTime} from "rxjs/operators";
 import Fuse from "fuse.js";
-import {FilterServiceState} from "../filtering/filter-service";
+import {IFilterServiceState} from "../filtering/filter-service";
 import {
   GridData, GridDataConfig, HiddenSearchColumn, HiddenSortColumn, ListAction, ListActionConfig, ListData,
   ListDataConfig, ListDataSourceOptions, ListFlag, ListSearchData, ListUniversalData, TableColumn, TableData
@@ -291,7 +291,7 @@ export class ListDataSource<TModel extends WithId> {
   //</editor-fold>
 
   //<editor-fold desc="Filtering">
-  private filter$: Observable<FilterServiceState<unknown, TModel> | undefined>;
+  private filter$: Observable<IFilterServiceState<TModel> | undefined>;
   public filterActive$: Observable<boolean>;
 
   private blackList$ = new BehaviorSubject<string[]>([]);
@@ -311,7 +311,7 @@ export class ListDataSource<TModel extends WithId> {
    * @param blacklist - A blacklist to exclude
    * @private
    */
-  private filter(list: TModel[] | undefined, filter: FilterServiceState<unknown, TModel> | undefined, blacklist: string[]): TModel[] {
+  private filter(list: TModel[] | undefined, filter: IFilterServiceState<TModel> | undefined, blacklist: string[]): TModel[] {
 
     if (!list?.length) return [];
 

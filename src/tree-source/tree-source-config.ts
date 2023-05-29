@@ -8,7 +8,7 @@ import {
 } from "../models/render-types";
 import {getSortingTypeSorting} from "../lib/sorting";
 import {TreeDataSource} from "./tree-data-source";
-import {TreeFolderFilterService, TreeItemFilterService} from "../filtering/filter-service";
+import {ITreeFolderFilterService, ITreeItemFilterService} from "../filtering/filter-service";
 import {ISorted, sortByIndexAsc} from "../lib/index-sort";
 import {
   arrToObj, Conditional, getSelectorFn, KeysOfTypeOrNull, lowerFirst, Selection, WithId
@@ -77,7 +77,7 @@ export class TreeDataOptionConfig<TFolder extends WithId, TItem extends WithId> 
    * Add a filter service for the folders
    * @param service - The filter service
    */
-  withFolderFilter(service: TreeFolderFilterService<any, TFolder>) {
+  withFolderFilter(service: ITreeFolderFilterService<TFolder>) {
     this.options.folderFilterService = service;
     return this;
   }
@@ -86,7 +86,7 @@ export class TreeDataOptionConfig<TFolder extends WithId, TItem extends WithId> 
    * Add a filter service for the items
    * @param service - The filter service
    */
-  withItemFilter(service: TreeItemFilterService<any, TItem>) {
+  withItemFilter(service: ITreeItemFilterService<TItem>) {
     this.options.itemFilterService = service;
     return this;
   }

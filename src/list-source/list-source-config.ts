@@ -1,7 +1,7 @@
 import {
   RenderDataTypes, RenderDataValueType, RenderValueDataType, SortingTypes, SortingValueType
 } from "../models/render-types";
-import {FilterService} from "../filtering/filter-service";
+import {IFilterService} from "../filtering/filter-service";
 import {
   GridDataConfig, HiddenSearchColumn, HiddenSortColumn, ListActionOptions, ListDataConfig, ListDataSourceOptions,
   ListNavigationOptions, TableColumn, TableColumnOptions
@@ -91,7 +91,7 @@ export interface IListDataSourceConfig<TModel extends WithId> {
    * Attach a filter service to the data source
    * @param service - The filter service
    */
-  withFilterService(service: FilterService<any, TModel>): this;
+  withFilterService(service: IFilterService<TModel>): this;
 
   /**
    * Make the sorting default to descending order
@@ -201,7 +201,7 @@ export class ListDataSourceConfig<TModel extends WithId> implements IListDataSou
     return this;
   }
 
-  withFilterService(service: FilterService<any, TModel>) {
+  withFilterService(service: IFilterService<TModel>) {
     this.options.filterService = service;
     return this;
   }

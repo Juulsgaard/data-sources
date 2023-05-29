@@ -10,7 +10,7 @@ import {
   TreeItemSearchRowData, TreeRowConfig, TreeSearchColumnConfig, TreeSearchConfig, TreeSearchData, TreeSearchRowData,
   TreeSortConfig
 } from "./tree-data";
-import {TreeFolderFilterState, TreeItemFilterState} from "../filtering/filter-service";
+import {ITreeFolderFilterState, ITreeItemFilterState} from "../filtering/filter-service";
 import {BulkRelocateModel, MoveModel} from "../models/move";
 import {cache} from "@consensus-labs/rxjs-tools";
 import {DetachedSearchData} from "../models/detached-search";
@@ -439,8 +439,8 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
   //</editor-fold>
 
   //<editor-fold desc="Filtering">
-  private folderFilter$: Observable<TreeFolderFilterState<unknown, TFolder>|undefined>;
-  private itemFilter$: Observable<TreeItemFilterState<unknown, TItem>|undefined>;
+  private folderFilter$: Observable<ITreeFolderFilterState<TFolder>|undefined>;
+  private itemFilter$: Observable<ITreeItemFilterState<TItem>|undefined>;
 
   private itemBlackList$ = new BehaviorSubject<string[]>([]);
   private folderBlackList$ = new BehaviorSubject<string[]>([]);
@@ -476,7 +476,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
    */
   private filterFolders(
     list: BaseTreeFolder<TFolder>[],
-    filter?: TreeFolderFilterState<unknown, TFolder>,
+    filter?: ITreeFolderFilterState<TFolder>,
     blacklist?: string[]
   ): BaseTreeFolder<TFolder>[] {
 
@@ -499,7 +499,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
    */
   private filterItems(
     list: BaseTreeItem<TItem>[],
-    filter?: TreeItemFilterState<unknown, TItem>,
+    filter?: ITreeItemFilterState<TItem>,
     blacklist?: string[]
   ):  BaseTreeItem<TItem>[] {
     if (!list) return [];
