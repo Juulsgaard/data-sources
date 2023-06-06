@@ -265,6 +265,7 @@ export interface TreeAsideData<TFolder, TItem> {
   path: TreePathData<TFolder, TItem>[];
 
   actions: TreeFolderAction<TFolder, TItem>[];
+  flags: TreeFlag[];
 
   folders: TreeAsideFolderData<TFolder, TItem>[];
   items: TreeAsideItemData<TFolder, TItem>[];
@@ -279,6 +280,7 @@ export interface TreeAsideFolderData<TFolder, TItem> {
   bonus?: string;
   model: TreeFolder<TFolder, TItem>;
   actions: TreeFolderAction<TFolder, TItem>[];
+  flags: TreeFlag[];
 }
 
 /**
@@ -290,6 +292,7 @@ export interface TreeAsideItemData<TFolder, TItem> {
   bonus?: string;
   model: TreeItem<TFolder, TItem>;
   actions: TreeItemAction<TFolder, TItem>[];
+  flags: TreeFlag[];
 }
 
 /**

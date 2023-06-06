@@ -659,7 +659,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
       this.options.folderFlags,
       (config): TreeFlag | undefined => {
 
-        const active = config.filter && !config.filter(folder.model, folder);
+        const active = !config.filter || config.filter(folder.model, folder);
 
         if (active) return {name: config.name, icon: config.icon};
 
@@ -674,7 +674,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
       this.options.itemFlags,
       (config): TreeFlag | undefined => {
 
-        const active = config.filter && !config.filter(item.model, item);
+        const active = !config.filter || config.filter(item.model, item);
 
         if (active) return {name: config.name, icon: config.icon};
 
@@ -715,6 +715,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
       folders,
       items,
       actions: this.mapFolderActions(folder),
+      flags: this.mapFolderFlags(folder),
       path
     }
   }
@@ -732,6 +733,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
       folders,
       items: [],
       actions: [],
+      flags: [],
       path: []
     }
   }
@@ -742,7 +744,8 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
       name: this.treeConfig?.folderName(folder.model, folder) ?? 'N/A',
       bonus: this.treeConfig?.folderBonus?.(folder.model, folder),
       icon: this.getFolderIcon(folder),
-      actions: this.mapFolderActions(folder)
+      actions: this.mapFolderActions(folder),
+      flags: this.mapFolderFlags(folder)
     };
   }
 
@@ -752,7 +755,8 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
       name: this.treeConfig?.itemName(item.model, item) ?? 'N/A',
       bonus: this.treeConfig?.itemBonus?.(item.model, item),
       icon: this.getItemIcon(item),
-      actions: this.mapItemActions(item)
+      actions: this.mapItemActions(item),
+      flags: this.mapItemFlags(item)
     };
   }
 
