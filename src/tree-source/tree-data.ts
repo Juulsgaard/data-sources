@@ -14,6 +14,7 @@ export interface TreeFolderData<TFolder, TItem> {
   items: TreeItemData<TFolder, TItem>[];
   data: TreeRowData;
   actions: TreeFolderAction<TFolder, TItem>[];
+  flags: TreeFlag[];
 }
 
 /**
@@ -23,6 +24,7 @@ export interface TreeItemData<TFolder, TItem> {
   model: TreeItem<TFolder, TItem>;
   data: TreeRowData;
   actions: TreeItemAction<TFolder, TItem>[];
+  flags: TreeFlag[];
 }
 
 /**
@@ -59,6 +61,7 @@ export interface TreeFolderSearchRowData<TFolder, TItem> {
   isFolder: true;
   model: TreeFolder<TFolder, TItem>;
   actions: TreeFolderAction<TFolder, TItem>[];
+  flags: TreeFlag[];
 }
 
 export interface TreeItemSearchRowData<TFolder, TItem> {
@@ -66,6 +69,7 @@ export interface TreeItemSearchRowData<TFolder, TItem> {
   isFolder: false;
   model: TreeItem<TFolder, TItem>;
   actions: TreeItemAction<TFolder, TItem>[];
+  flags: TreeFlag[];
 }
 
 export type TreeSearchRowData<TFolder, TItem> = TreeFolderSearchRowData<TFolder, TItem> | TreeItemSearchRowData<TFolder, TItem>;
@@ -151,6 +155,9 @@ export interface TreeDataSourceOptions<TFolder, TItem> {
 
   folderActions: TreeFolderActionConfig<TFolder, TItem>[];
   itemActions: TreeItemActionConfig<TFolder, TItem>[];
+
+  folderFlags: TreeFolderFlagConfig<TFolder, TItem>[];
+  itemFlags: TreeItemFlagConfig<TFolder, TItem>[];
 
   moveActions: TreeMoveActions;
 }
@@ -293,6 +300,37 @@ export interface TreePathData<TFolder, TItem> {
   model: TreeFolder<TFolder, TItem>;
 }
 
+//</editor-fold>
+
+//<editor-fold desc="Flags">
+
+interface BaseTreeFlagConfig {
+  icon: string;
+  name: string;
+  inactiveIcon?: string;
+  inactiveName?: string;
+}
+
+/**
+ * A config for mapping Folder status flags
+ */
+export interface TreeFolderFlagConfig<TFolder, TItem> extends BaseTreeFlagConfig {
+  /** A filter to determine when the flag should be visible */
+  filter?: TreeFolderMap<TFolder, TItem, boolean>;
+}
+
+/**
+ * A config for mapping Folder status flags
+ */
+export interface TreeItemFlagConfig<TFolder, TItem> extends BaseTreeFlagConfig {
+  /** A filter to determine when the flag should be visible */
+  filter?: TreeItemMap<TFolder, TItem, boolean>;
+}
+
+export interface TreeFlag {
+  icon: string;
+  name: string;
+}
 //</editor-fold>
 
 //<editor-fold desc="Actions">

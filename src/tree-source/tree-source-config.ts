@@ -25,6 +25,8 @@ export class TreeDataOptionConfig<TFolder extends WithId, TItem extends WithId> 
       folderChildren,
       folderActions: [],
       itemActions: [],
+      folderFlags: [],
+      itemFlags: [],
       moveActions: {}
     };
   }
@@ -126,6 +128,19 @@ export class TreeDataOptionConfig<TFolder extends WithId, TItem extends WithId> 
   }
 
   /**
+   * Define a flag for folders
+   * Flags are optional icons that can be shown next to folders
+   * @param name - The name of the flag
+   * @param icon - The icon used for rendering the flag
+   * @param filter - A filter to determine if the flag should be shown
+   * @param inactiveIcon - Define an icon for when the flag is not active
+   */
+  addFolderFlag(name: string, icon: string, filter: TreeFolderMap<TFolder, TItem, boolean>, inactiveIcon?: string) {
+    this.options.folderFlags.push({name, icon, filter, inactiveIcon});
+    return this;
+  }
+
+  /**
    * Add an action that can be performed on an item
    * @param name - The display name of the Action
    * @param icon - The icon for the Action
@@ -156,6 +171,19 @@ export class TreeDataOptionConfig<TFolder extends WithId, TItem extends WithId> 
       route,
       ...options
     });
+    return this;
+  }
+
+  /**
+   * Define a flag for items
+   * Flags are optional icons that can be shown next to items
+   * @param name - The name of the flag
+   * @param icon - The icon used for rendering the flag
+   * @param filter - A filter to determine if the flag should be shown
+   * @param inactiveIcon - Define an icon for when the flag is not active
+   */
+  addItemFlag(name: string, icon: string, filter: TreeItemMap<TFolder, TItem, boolean>, inactiveIcon?: string) {
+    this.options.itemFlags.push({name, icon, filter, inactiveIcon});
     return this;
   }
 

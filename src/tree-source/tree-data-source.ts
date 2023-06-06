@@ -4,7 +4,7 @@ import {
 import {catchError, distinctUntilChanged, map, switchMap, tap, throttleTime} from "rxjs/operators";
 import Fuse from "fuse.js";
 import {
-  BaseTreeFolder, BaseTreeItem, TreeAsideData, TreeAsideFolderData, TreeAsideItemData, TreeDataSourceOptions,
+  BaseTreeFolder, BaseTreeItem, TreeAsideData, TreeAsideFolderData, TreeAsideItemData, TreeDataSourceOptions, TreeFlag,
   TreeFolder, TreeFolderAction, TreeFolderData, TreeFolderSearchData, TreeFolderSearchRowData,
   TreeHiddenSearchColumnConfig, TreeHiddenSortColumnConfig, TreeItem, TreeItemAction, TreeItemData, TreeItemSearchData,
   TreeItemSearchRowData, TreeRowConfig, TreeSearchColumnConfig, TreeSearchConfig, TreeSearchData, TreeSearchRowData,
@@ -634,18 +634,52 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
     );
   }
 
-  private mapItemActions(folder: TreeItem<TFolder, TItem>): TreeItemAction<TFolder, TItem>[] {
+  private mapItemActions(item: TreeItem<TFolder, TItem>): TreeItemAction<TFolder, TItem>[] {
     return mapArr(
       this.options.itemActions,
       (config): TreeItemAction<TFolder, TItem>|undefined => {
         if (!config.action && !config.route) return undefined;
-        if (config.filter && !config.filter(folder.model, folder)) return undefined;
+        if (config.filter && !config.filter(item.model, item)) return undefined;
 
         if (config.route === undefined) {
           return config as TreeItemAction<TFolder, TItem>;
         }
 
-        return {name: config.name, icon: config.icon, color: config.color, newTab: !!config.newTab, route: config.route(folder.model, folder)};
+        return {name: config.name, icon: config.icon, color: config.color, newTab: !!config.newTab, route: config.route(item.model, item)};
+      }
+    );
+  }
+
+  //</editor-fold>
+
+  //<editor-fold desc="Flag Mapping">
+
+  private mapFolderFlags(folder: TreeFolder<TFolder, TItem>): TreeFlag[] {
+    return mapArr(
+      this.options.folderFlags,
+      (config): TreeFlag | undefined => {
+
+        const active = config.filter && !config.filter(folder.model, folder);
+
+        if (active) return {name: config.name, icon: config.icon};
+
+        if (!config.inactiveIcon) return undefined;
+        return {name: config.inactiveName ?? config.name, icon: config.inactiveIcon};
+      }
+    );
+  }
+
+  private mapItemFlags(item: TreeItem<TFolder, TItem>): TreeFlag[] {
+    return mapArr(
+      this.options.itemFlags,
+      (config): TreeFlag | undefined => {
+
+        const active = config.filter && !config.filter(item.model, item);
+
+        if (active) return {name: config.name, icon: config.icon};
+
+        if (!config.inactiveIcon) return undefined;
+        return {name: config.inactiveName ?? config.name, icon: config.inactiveIcon};
       }
     );
   }
@@ -760,6 +794,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
       items,
       folders,
       actions: this.mapFolderActions(folder),
+      flags: this.mapFolderFlags(folder),
       data: {
         name: this.treeConfig!.folderName(folder.model, folder),
         icon: this.getFolderIcon(folder),
@@ -779,6 +814,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
     return {
       model: item,
       actions: this.mapItemActions(item),
+      flags: this.mapItemFlags(item),
       data: {
         icon: this.getItemIcon(item),
         name: this.treeConfig!.itemName(item.model, item),
@@ -848,13 +884,15 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
       if (row.isFolder) {
         return {
           ...row, data,
-          actions: this.mapFolderActions(row.model)
+          actions: this.mapFolderActions(row.model),
+          flags: this.mapFolderFlags(row.model)
         };
       }
 
       return {
         ...row, data,
-        actions: this.mapItemActions(row.model)
+        actions: this.mapItemActions(row.model),
+        flags: this.mapItemFlags(row.model)
       };
     });
 
