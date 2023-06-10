@@ -54,6 +54,13 @@ export interface IListDataSourceConfig<TModel extends WithId> {
   addFlag(name: string, icon: string, filter: (model: TModel) => boolean, inactiveIcon?: string): this;
 
   /**
+   * Define a custom CSS class for matched items
+   * @param cssClass - The cssClass to apply
+   * @param condition - The condition for when to apply the CSS class
+   */
+  addClass(cssClass: string, condition: (model: TModel) => boolean): this;
+
+  /**
    * Define an actions that can be performed for an item
    * @param name - The display name of the action
    * @param icon - The icon to show with the action
@@ -121,6 +128,7 @@ export class ListDataSourceConfig<TModel extends WithId> implements IListDataSou
     actions: [],
     indexSorted: false,
     flags: [],
+    cssClasses: [],
     defaultSortOrder: 'asc'
   };
 
@@ -147,7 +155,7 @@ export class ListDataSourceConfig<TModel extends WithId> implements IListDataSou
   }
 
   addList(firstLine: (model: TModel) => string) {
-    this.listConfig = {firstLine, avatarPlaceholder: 'assets/placeholders/image.webp', styles: []};
+    this.listConfig = {firstLine, avatarPlaceholder: 'assets/placeholders/image.webp'};
     return new ListConfig(this);
   }
 
@@ -158,6 +166,11 @@ export class ListDataSourceConfig<TModel extends WithId> implements IListDataSou
 
   addFlag(name: string, icon: string, filter: (model: TModel) => boolean, inactiveIcon?: string) {
     this.options.flags.push({name, icon, filter, inactiveIcon});
+    return this;
+  }
+
+  addClass(cssClass: string, condition: (model: TModel) => boolean) {
+    this.options.cssClasses.push({cssClass, condition});
     return this;
   }
 
@@ -420,16 +433,6 @@ class ListConfig<TModel extends WithId> {
    */
   icon(icon: MapFunc<TModel, string|undefined>|string) {
     this.listConfig.icon = isString(icon) ? () => icon : icon;
-    return this;
-  }
-
-  /**
-   * Add custom styling to the List Rendering
-   * @param cssClass - The CSS class to apply
-   * @param condition - The condition for applying the style
-   */
-  style(cssClass: 'faded'|string, condition: (model: TModel) => boolean) {
-    this.listConfig.styles.push({cssClass, condition});
     return this;
   }
 

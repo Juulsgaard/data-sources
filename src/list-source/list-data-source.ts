@@ -337,7 +337,11 @@ export class ListDataSource<TModel extends WithId> {
       return icon ? {icon, name} as ListFlag : null;
     });
 
-    return {model: row, actions, flags};
+    const cssClasses = this.options.cssClasses
+      .filter(style => style.condition(row))
+      .map(x => x.cssClass)
+
+    return {model: row, actions, flags, cssClasses};
   }
   //</editor-fold>
 
@@ -527,8 +531,7 @@ export class ListDataSource<TModel extends WithId> {
       firstLine: this.listConfig!.firstLine(item.model),
       secondLine: this.listConfig!.secondLine?.(item.model),
       avatar: this.getImageUrl(item.model, !icon ? this.listConfig!.avatarPlaceholder : undefined, this.listConfig!.avatar, this.listConfig!.avatarCacheBuster),
-      icon: icon,
-      cssClasses: this.listConfig!.styles.filter(style => style.condition(item.model)).map(x => x.cssClass)
+      icon: icon
     }
   }
 

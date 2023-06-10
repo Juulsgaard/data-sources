@@ -69,7 +69,6 @@ export interface ListDataConfig<TItem> {
     avatarCacheBuster?: (data: TItem) => string|Date|undefined;
     avatarPlaceholder?: string;
     icon?: MapFunc<TItem, string|undefined>;
-    styles: {cssClass: string, condition: (data: TItem) => boolean}[];
 }
 //</editor-fold>
 
@@ -80,6 +79,7 @@ export interface TableData<TModel> {
     data: Record<string, any|undefined>;
     actions: ListAction<TModel>[];
     flags: ListFlag[];
+    cssClasses: string[];
 }
 //</editor-fold>
 
@@ -97,6 +97,7 @@ export interface GridData<TModel> {
     index?: number;
     actions: ListAction<TModel>[];
     flags: ListFlag[];
+    cssClasses: string[];
 }
 
 /**
@@ -178,6 +179,7 @@ export interface ListDataSourceOptions<TModel> {
     filterService?: IFilterService<TModel>;
     actions: ListActionConfig<TModel>[];
     flags: ListFlagConfig<TModel>[];
+    cssClasses: {cssClass: string, condition: (data: TModel) => boolean}[];
     indexSorted: boolean;
     defaultSortOrder: 'asc'|'desc';
 }
@@ -186,6 +188,7 @@ export interface ListUniversalData<TModel> {
     model: TModel;
     flags: ListFlag[];
     actions: ListAction<TModel>[];
+    cssClasses: string[];
 }
 
 export interface ListSearchData<TModel> {
