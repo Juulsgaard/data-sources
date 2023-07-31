@@ -1,6 +1,6 @@
 import {IFilterService} from "../filtering/filter-service";
 import {ThemeColor} from "../lib/types";
-import {MapFunc, SortFn} from "@consensus-labs/ts-tools";
+import {MapFunc, SortFn} from "@juulsgaard/ts-tools";
 import {RenderValueDataType, SortableValueTypes} from "../models/render-types";
 
 //<editor-fold desc="Column Data">

@@ -8,9 +8,9 @@ import {
 } from "./list-data";
 import {ISorted, sortByIndexAsc} from "../lib/index-sort";
 import {DetachedSearchData} from "../models/detached-search";
-import {applyQueryParam, arrToMap, mapArr, mapToArr, SimpleObject, SortFn, WithId} from "@consensus-labs/ts-tools";
+import {applyQueryParam, arrToMap, mapArr, mapToArr, SimpleObject, SortFn, WithId} from "@juulsgaard/ts-tools";
 import {Page, Sort} from "../lib/types";
-import {cache, mapListChanged, persistentCache} from "@consensus-labs/rxjs-tools";
+import {cache, mapListChanged, persistentCache} from "@juulsgaard/rxjs-tools";
 import FuseResult = Fuse.FuseResult;
 
 export class ListDataSource<TModel extends WithId> {

@@ -1,4 +1,4 @@
-import {Selection, WithId} from "@consensus-labs/ts-tools";
+import {Selection, WithId} from "@juulsgaard/ts-tools";
 import {IListDataSourceConfig, ListDataSourceConfig} from "./list-source/list-source-config";
 import {TreeDataOptionConfig} from "./tree-source/tree-source-config";
 

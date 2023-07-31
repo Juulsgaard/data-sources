@@ -1,7 +1,7 @@
 import {
   RenderDataTypes, RenderValueDataType, SortableValueTypes, SortingTypes, SortingValueType
 } from "../models/render-types";
-import {sortAlphAsc, sortBoolAsc, sortDateAsc, SortFn, sortNumAsc} from "@consensus-labs/ts-tools";
+import {sortAlphAsc, sortBoolAsc, sortDateAsc, SortFn, sortNumAsc} from "@juulsgaard/ts-tools";
 
 
 export function getRenderDataTypeSorting<TVal extends SortableValueTypes>(type: RenderValueDataType<TVal>): SortFn<TVal|undefined>;

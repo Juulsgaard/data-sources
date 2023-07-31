@@ -1,7 +1,7 @@
 import {BehaviorSubject, combineLatest, EMPTY, merge, Observable, Observer, Subscribable, Unsubscribable} from "rxjs";
 import {distinctUntilChanged, map} from "rxjs/operators";
-import {cache} from "@consensus-labs/rxjs-tools";
-import {isString, WithId} from "@consensus-labs/ts-tools";
+import {cache} from "@juulsgaard/rxjs-tools";
+import {isString, WithId} from "@juulsgaard/ts-tools";
 import {ListDataSource} from "./list-data-source";
 
 export class ListState<TModel extends WithId> implements Subscribable<TModel | undefined> {

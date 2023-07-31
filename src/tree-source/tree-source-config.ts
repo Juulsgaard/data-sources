@@ -12,7 +12,7 @@ import {ITreeFolderFilterService, ITreeItemFilterService} from "../filtering/fil
 import {ISorted, sortByIndexAsc} from "../lib/index-sort";
 import {
   arrToObj, Conditional, getSelectorFn, KeysOfTypeOrNull, lowerFirst, Selection, WithId
-} from "@consensus-labs/ts-tools";
+} from "@juulsgaard/ts-tools";
 
 //<editor-fold desc="Option Builder">
 export class TreeDataOptionConfig<TFolder extends WithId, TItem extends WithId> {

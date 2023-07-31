@@ -1,19 +1,13 @@
-# Store Service
+# Data Sources
 
-A state management system for Javascript
+![NPM License](https://img.shields.io/npm/v/@juulsgaard/data-sources)
+![NPM License](https://img.shields.io/npm/l/@juulsgaard/data-sources)
+![NPM Downloads](https://img.shields.io/npm/dw/@juulsgaard/data-sources)
 
-## Getting started
+An RXJS based library for handling large collections of items
 
-In order to be able to publish the NPM package you will need to add your GitLab API token (API Access) via the following command
+## Description
 
-```cmd
-npm config set //gitlab.com/api/v4/projects/36921000/packages/npm/:_authToken $AUTH_TOKEN$
-```
+This library implements Data Sources.
 
-Where `$AUTH_TOKEN$` is your GitLab API token
-
-You will also need to add the following for package download:
-
-```cmd
-npm config set //gitlab.com/api/v4/packages/npm/:_authToken $AUTH_TOKEN$
-```
+Data Sources are entities that contain collections of items. They are built using a declarative syntax and depending on the configuration will handle everything from mapping, filtering, sorting, searching and pagination.

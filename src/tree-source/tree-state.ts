@@ -5,8 +5,8 @@ import {
 import {distinctUntilChanged, filter, map, skip, switchMap} from "rxjs/operators";
 import {BaseTreeFolder, BaseTreeItem, TreeAsideData, TreeFolder, TreeItem} from "./tree-data";
 import {TreeDataSource} from "./tree-data-source";
-import {WithId} from "@consensus-labs/ts-tools";
-import {cache, latestValueFromOrDefault} from "@consensus-labs/rxjs-tools";
+import {WithId} from "@juulsgaard/ts-tools";
+import {cache, latestValueFromOrDefault} from "@juulsgaard/rxjs-tools";
 
 export class TreeState<TFolder extends WithId, TItem extends WithId> implements Subscribable<TItem | undefined> {
 

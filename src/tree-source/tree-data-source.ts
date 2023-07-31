@@ -12,11 +12,11 @@ import {
 } from "./tree-data";
 import {ITreeFolderFilterState, ITreeItemFilterState} from "../filtering/filter-service";
 import {BulkRelocateModel, MoveModel} from "../models/move";
-import {cache, persistentCache} from "@consensus-labs/rxjs-tools";
+import {cache, persistentCache} from "@juulsgaard/rxjs-tools";
 import {DetachedSearchData} from "../models/detached-search";
 import {
   applySelector, arrToLookup, arrToMap, mapArr, mapToArr, SimpleObject, SortFn, titleCase, WithId
-} from "@consensus-labs/ts-tools";
+} from "@juulsgaard/ts-tools";
 import {Sort} from "../lib/types";
 
 export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {

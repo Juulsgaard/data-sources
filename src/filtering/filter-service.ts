@@ -1,10 +1,10 @@
 import {asyncScheduler, BehaviorSubject, debounceTime, EMPTY, Observable, startWith, Subscription} from "rxjs";
 import {catchError, distinctUntilChanged, map, skip, throttleTime} from "rxjs/operators";
 import {BaseTreeFolder, BaseTreeItem} from "../tree-source/tree-data";
-import {deepCopy} from "@consensus-labs/ts-tools";
+import {deepCopy} from "@juulsgaard/ts-tools";
 import {FilterAdapter, FilterReadState, FilterSaveState, MappedReadState} from "./filter-adapter";
 import {DataFilter, IndividualDataFilter} from "./data-filter";
-import {cache} from "@consensus-labs/rxjs-tools";
+import {cache} from "@juulsgaard/rxjs-tools";
 
 export interface IFilterServiceState<TModel> {
   filter<T extends TModel>(list: T[]): T[];

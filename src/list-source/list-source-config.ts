@@ -10,7 +10,7 @@ import {ListDataSource} from "./list-data-source";
 import {getRenderDataTypeSorting, getSortingTypeSorting} from "../lib/sorting";
 import {
   arrToObj, getSelectorFn, isString, KeysOfTypeOrNull, lowerFirst, MapFunc, SortFn, WithId
-} from "@consensus-labs/ts-tools";
+} from "@juulsgaard/ts-tools";
 
 
 type TableColumnConfigs<TModel extends WithId> = {

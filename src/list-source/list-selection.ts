@@ -1,10 +1,10 @@
-import {isString, WithId} from "@consensus-labs/ts-tools";
+import {isString, WithId} from "@juulsgaard/ts-tools";
 import {
   asyncScheduler, combineLatest, combineLatestWith, Observable, Observer, Subscribable, Unsubscribable
 } from "rxjs";
 import {ListDataSource} from "./list-data-source";
 import {distinctUntilChanged, map, throttleTime} from "rxjs/operators";
-import {cache, ObservableSet} from "@consensus-labs/rxjs-tools";
+import {cache, ObservableSet} from "@juulsgaard/rxjs-tools";
 import {ListState} from "./list-state";
 
 export class ListSelection<TModel extends WithId> extends ListState<TModel> {

@@ -1,7 +1,7 @@
 import {ITreeFolderFilterService, ITreeItemFilterService} from "../filtering/filter-service";
 import {RenderValueDataType} from "../models/render-types";
 import {BulkRelocateModel, MoveModel} from "../models/move";
-import {Selection, SortFn} from "@consensus-labs/ts-tools";
+import {Selection, SortFn} from "@juulsgaard/ts-tools";
 import {ThemeColor} from "../lib/types";
 
 //<editor-fold desc="Tree Data Structure">

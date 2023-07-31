@@ -1,8 +1,8 @@
-import {isString, WithId} from "@consensus-labs/ts-tools";
+import {isString, WithId} from "@juulsgaard/ts-tools";
 import {BehaviorSubject, Observable, Observer, of, shareReplay, Subscribable, Unsubscribable} from "rxjs";
 import {TreeDataSource} from "./tree-data-source";
 import {distinctUntilChanged, map, switchMap} from "rxjs/operators";
-import {cache, ObservableSet} from "@consensus-labs/rxjs-tools";
+import {cache, ObservableSet} from "@juulsgaard/rxjs-tools";
 import {BaseTreeItem, TreeFolder} from "./tree-data";
 
 export class TreeSelection<TFolder extends WithId, TItem extends WithId> implements Subscribable<TItem | undefined> {
