@@ -12,7 +12,7 @@ import {
 } from "./tree-data";
 import {ITreeFolderFilterState, ITreeItemFilterState} from "../filtering/filter-service";
 import {BulkRelocateModel, MoveModel} from "../models/move";
-import {cache, persistentCache} from "@juulsgaard/rxjs-tools";
+import {cache, latestValueFromOrDefault, persistentCache} from "@juulsgaard/rxjs-tools";
 import {DetachedSearchData} from "../models/detached-search";
 import {
   applySelector, arrToLookup, arrToMap, mapArrNotNull, mapToArr, SimpleObject, SortFn, titleCase, WithId
@@ -22,33 +22,33 @@ import {Sort} from "../lib/types";
 export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
 
   //<editor-fold desc="Outputs">
-  treeData$: Observable<TreeFolderData<TFolder, TItem>[]>;
+  readonly treeData$: Observable<TreeFolderData<TFolder, TItem>[]>;
 
-  searchResult$: Observable<TreeSearchRowData<TFolder, TItem>[]>;
-  folderSearchResult$: Observable<TreeFolderSearchRowData<TFolder, TItem>[]>;
-  itemSearchResult$: Observable<TreeItemSearchRowData<TFolder, TItem>[]>;
+  readonly searchResult$: Observable<TreeSearchRowData<TFolder, TItem>[]>;
+  readonly folderSearchResult$: Observable<TreeFolderSearchRowData<TFolder, TItem>[]>;
+  readonly itemSearchResult$: Observable<TreeItemSearchRowData<TFolder, TItem>[]>;
 
   //</editor-fold>
 
   //<editor-fold desc="Lookups">
-  baseItems$: Observable<BaseTreeItem<TItem>[]>;
-  metaItems$: Observable<TreeItem<TFolder, TItem>[]>;
+  readonly baseItems$: Observable<BaseTreeItem<TItem>[]>;
+  readonly metaItems$: Observable<TreeItem<TFolder, TItem>[]>;
 
-  itemLookup$: Observable<Map<string, TItem>>;
-  baseItemLookup$: Observable<Map<string, BaseTreeItem<TItem>>>;
-  metaItemLookup$: Observable<Map<string, TreeItem<TFolder, TItem>>>;
+  readonly itemLookup$: Observable<Map<string, TItem>>;
+  readonly baseItemLookup$: Observable<Map<string, BaseTreeItem<TItem>>>;
+  readonly metaItemLookup$: Observable<Map<string, TreeItem<TFolder, TItem>>>;
 
-  baseFolders$: Observable<BaseTreeFolder<TFolder>[]>;
-  metaFolders$: Observable<TreeFolder<TFolder, TItem>[]>;
+  readonly baseFolders$: Observable<BaseTreeFolder<TFolder>[]>;
+  readonly metaFolders$: Observable<TreeFolder<TFolder, TItem>[]>;
 
-  folderLookup$: Observable<Map<string, TFolder>>;
-  baseFolderLookup$: Observable<Map<string, BaseTreeFolder<TFolder>>>;
-  metaFolderLookup$: Observable<Map<string, TreeFolder<TFolder, TItem>>>;
+  readonly folderLookup$: Observable<Map<string, TFolder>>;
+  readonly baseFolderLookup$: Observable<Map<string, BaseTreeFolder<TFolder>>>;
+  readonly metaFolderLookup$: Observable<Map<string, TreeFolder<TFolder, TItem>>>;
   //</editor-fold>
 
-  public columns: TreeSearchColumnConfig<TFolder, any, TItem, any>[];
-  public sortOptions: SortOption[] = [];
-  public hiddenSortOptions: SortOption[] = [];
+  readonly columns: TreeSearchColumnConfig<TFolder, any, TItem, any>[];
+  readonly sortOptions: SortOption[] = [];
+  readonly hiddenSortOptions: SortOption[] = [];
 
   private sortLookup = new Map<string, TreeSortConfig<TFolder, TItem, unknown>>();
   private searchConfigs = new Map<string, TreeSearchConfig<TFolder, TItem>>();
@@ -147,15 +147,15 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
 
     //<editor-fold desc="Base Lists">
     // Folders
-    this.folderList$ = merge(
-      this._folderList$,
-      this._folderListObservables$.pipe(switchMap(x => x))
+    this.folders$ = merge(
+      this._folders$,
+      this._folderSources$.pipe(switchMap(x => x))
     ).pipe(cache());
 
     if (options.folderParentId) {
       const folderParentId = options.folderParentId;
 
-      this.baseFolders$ = this.folderList$.pipe(
+      this.baseFolders$ = this.folders$.pipe(
         map((folders) => folders.map(folder => ({
           model: folder,
           parentId: applySelector(folder, folderParentId)
@@ -165,7 +165,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
 
     } else {
 
-      this.baseFolders$ = this.folderList$.pipe(
+      this.baseFolders$ = this.folders$.pipe(
         map((folders) => folders.map(folder => ({model: folder}))),
         cache()
       );
@@ -176,12 +176,12 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
     if (options.folderChildren) {
       const folderChildren = options.folderChildren;
 
-      this.itemList$ = this.folderList$.pipe(
+      this.items$ = this.folders$.pipe(
         map(list => list.flatMap(folder => applySelector(folder, folderChildren))),
         cache()
       );
 
-      this.baseItems$ = this.folderList$.pipe(
+      this.baseItems$ = this.folders$.pipe(
         map(list => list.flatMap(
           folder => applySelector(folder, folderChildren).map(item => ({
             folderId: folder.id,
@@ -195,12 +195,12 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
 
       const itemParentId = options.itemParentId;
 
-      this.itemList$ = merge(
-        this._itemList$,
-        this._itemListObservables$.pipe(switchMap(x => x))
+      this.items$ = merge(
+        this._items$,
+        this._itemSources$.pipe(switchMap(x => x))
       ).pipe(cache());
 
-      this.baseItems$ = this.itemList$.pipe(
+      this.baseItems$ = this.items$.pipe(
         map(list => list.map(item => ({
           folderId: applySelector(item, itemParentId),
           model: item
@@ -231,7 +231,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
     );
 
     //<editor-fold desc="Lookups">
-    this.folderLookup$ = this.folderList$.pipe(
+    this.folderLookup$ = this.folders$.pipe(
       map(list => arrToMap(list, x => x.id, x => x)),
       cache()
     );
@@ -246,7 +246,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
       cache()
     );
 
-    this.itemLookup$ = this.itemList$.pipe(
+    this.itemLookup$ = this.items$.pipe(
       map(list => arrToMap(list, x => x.id, x => x)),
       cache()
     );
@@ -263,8 +263,8 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
     //</editor-fold>
 
     // State
-    this.foldersEmpty$ = this.folderList$.pipe(map(x => !x.length), distinctUntilChanged());
-    this.itemsEmpty$ = this.itemList$.pipe(map(x => !x.length), distinctUntilChanged());
+    this.foldersEmpty$ = this.folders$.pipe(map(x => !x.length), startWith(true), distinctUntilChanged());
+    this.itemsEmpty$ = this.items$.pipe(map(x => !x.length), startWith(true), distinctUntilChanged());
 
 
     // Filtering
@@ -371,11 +371,14 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
   }
 
   //<editor-fold desc="Folder Population">
-  private readonly _folderList$ = new ReplaySubject<TFolder[]>(1);
-  private readonly _folderListObservables$ = new ReplaySubject<Observable<TFolder[]>>(1);
+  private readonly _folders$ = new ReplaySubject<TFolder[]>(1);
+  private readonly _folderSources$ = new ReplaySubject<Observable<TFolder[]>>(1);
   private readonly _recalculateFolders$ = new BehaviorSubject<void>(undefined);
 
-  public readonly folderList$: Observable<TFolder[]>;
+  get folders(): TFolder[] {return latestValueFromOrDefault(this.folders$, [])}
+  public readonly folders$: Observable<TFolder[]>;
+
+  public get foldersEmpty() {return this.folders.length <= 0}
   public readonly foldersEmpty$: Observable<boolean>;
 
   /**
@@ -383,33 +386,36 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
    * This triggers all affected data sources to re-evaluate
    * @param folders - A list of Folders
    */
-  set folders(folders: TFolder[]) {
-    this._folderList$.next(folders);
+  setFolders(folders: TFolder[]) {
+    this._folders$.next(folders);
   }
 
   /**
-   * Manually populate the folder data via observable
+   * Populate the folder data via observable
    * @param folders$
    */
-  set folders$(folders$: Observable<TFolder[]>) {
-    this._folderListObservables$.next(folders$.pipe(catchError(() => of([]))));
+  setFolders$(folders$: Observable<TFolder[]>) {
+    this._folderSources$.next(folders$.pipe(catchError(() => of([]))));
   }
 
   /**
    * Trigger a re-calculation of the folder data source pipeline
    */
-  recalculateFolder() {
+  recalculateFolders() {
     this._recalculateFolders$.next();
   }
 
   //</editor-fold>
 
   //<editor-fold desc="Item Population">
-  private readonly _itemList$ = new ReplaySubject<TItem[]>(1);
-  private readonly _itemListObservables$ = new ReplaySubject<Observable<TItem[]>>(1);
+  private readonly _items$ = new ReplaySubject<TItem[]>(1);
+  private readonly _itemSources$ = new ReplaySubject<Observable<TItem[]>>(1);
   private readonly _recalculateItems$ = new BehaviorSubject<void>(undefined);
 
-  public readonly itemList$: Observable<TItem[]>;
+  get items(): TItem[] {return latestValueFromOrDefault(this.items$, [])}
+  public readonly items$: Observable<TItem[]>;
+
+  public get itemsEmpty() {return this.items.length <= 0}
   public readonly itemsEmpty$: Observable<boolean>;
 
   /**
@@ -417,16 +423,16 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
    * This triggers all affected data sources to re-evaluate
    * @param items - A list of Items
    */
-  set items(items: TItem[]) {
-    this._itemList$.next(items);
+  setItems(items: TItem[]) {
+    this._items$.next(items);
   }
 
   /**
-   * Manually populate the item data via observable
+   * Populate the item data via observable
    * @param items$
    */
-  set items$(items$: Observable<TItem[]>) {
-    this._itemListObservables$.next(items$.pipe(catchError(() => of([]))));
+  setItems$(items$: Observable<TItem[]>) {
+    this._itemSources$.next(items$.pipe(catchError(() => of([]))));
   }
 
   /**

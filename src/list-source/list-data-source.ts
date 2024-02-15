@@ -10,7 +10,7 @@ import {ISorted, sortByIndexAsc} from "../lib/index-sort";
 import {DetachedSearchData} from "../models/detached-search";
 import {applyQueryParam, arrToMap, mapArrNotNull, mapToArr, SimpleObject, SortFn, WithId} from "@juulsgaard/ts-tools";
 import {Page, Sort} from "../lib/types";
-import {cache, mapListChanged, persistentCache} from "@juulsgaard/rxjs-tools";
+import {cache, latestValueFromOrDefault, mapListChanged, persistentCache} from "@juulsgaard/rxjs-tools";
 
 export class ListDataSource<TModel extends WithId> {
 
@@ -115,22 +115,22 @@ export class ListDataSource<TModel extends WithId> {
     //<editor-fold desc="Setup Observables">
 
     // Items
-    this.itemList$ = merge(
-      this._itemList$,
-      this._itemListObservables$.pipe(switchMap(x => x))
+    this.items$ = merge(
+      this._items$,
+      this._itemSources$.pipe(switchMap(x => x))
     ).pipe(cache());
 
-    this.itemLookup$ = this.itemList$.pipe(
+    this.itemLookup$ = this.items$.pipe(
       map(list => arrToMap(list, x => x.id, x => x)),
       cache()
     );
 
     // State
-    this.empty$ = this.itemList$.pipe(map(x => !x.length), distinctUntilChanged());
+    this.empty$ = this.items$.pipe(map(x => !x.length), startWith(true), distinctUntilChanged());
 
 
     // Filtering
-    const filtered$ = combineLatest([this.itemList$, this.filter$, this.blackList$, this._recalculate$]).pipe(
+    const filtered$ = combineLatest([this.items$, this.filter$, this.blackList$, this._recalculate$]).pipe(
       map(([x, filter, blacklist]) => this.filter(x, filter, blacklist)),
       map(list => this.indexSort(list)),
       tap(list => this.updatePage(list.length))
@@ -218,7 +218,7 @@ export class ListDataSource<TModel extends WithId> {
     )
 
     // Outputs
-    this.filteredItemList$ = sorted$;
+    this.filteredItems$ = sorted$;
 
     this.simpleData$ = paginated$.pipe(
       mapListChanged(this.mapToUniversal.bind(this), this.options.pureMapping),
@@ -256,28 +256,32 @@ export class ListDataSource<TModel extends WithId> {
   }
 
   //<editor-fold desc="Item Population">
-  private readonly _itemList$ = new ReplaySubject<TModel[]>(1);
-  private readonly _itemListObservables$ = new ReplaySubject<Observable<TModel[]>>(1);
+  private readonly _items$ = new ReplaySubject<TModel[]>(1);
+  private readonly _itemSources$ = new ReplaySubject<Observable<TModel[]>>(1);
   private readonly _recalculate$ = new BehaviorSubject<void>(undefined);
 
-  public readonly itemList$: Observable<TModel[]>;
-  public readonly filteredItemList$: Observable<TModel[]>;
+  public get items(): TModel[] {return latestValueFromOrDefault(this.items$, [])}
+  public readonly items$: Observable<TModel[]>;
+  public readonly filteredItems$: Observable<TModel[]>;
+
+  public get empty() {return this.items.length <= 0}
   public readonly empty$: Observable<boolean>;
 
+
   /**
-   * Manually populate the data source
+   * Populate the data source
    * @param items
    */
-  set items(items: TModel[]) {
-    this._itemList$.next(items);
+  setItems(items: TModel[]) {
+    this._items$.next(items);
   }
 
   /**
-   * Manually populate the data source via observable
+   * Populate the data source via observable
    * @param items$
    */
-  set items$(items$: Observable<TModel[]>) {
-    this._itemListObservables$.next(items$.pipe(catchError(() => of([]))));
+  setItems$(items$: Observable<TModel[]>) {
+    this._itemSources$.next(items$.pipe(catchError(() => of([]))));
   }
 
   /**

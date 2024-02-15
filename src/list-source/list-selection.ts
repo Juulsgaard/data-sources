@@ -77,7 +77,7 @@ export class ListRange<TModel extends WithId> implements Subscribable<TModel[]> 
 
     this.empty$ = this.items$.pipe(map(x => !x.length));
 
-    this.selectAllState$ = dataSource.itemList$.pipe(
+    this.selectAllState$ = dataSource.items$.pipe(
       combineLatestWith(this.itemIds$),
       throttleTime(500, asyncScheduler, {leading: true, trailing: true}),
       map(([items, selected]) => {
