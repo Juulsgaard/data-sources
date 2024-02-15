@@ -1,6 +1,6 @@
 import {asyncScheduler, BehaviorSubject, combineLatest, merge, Observable, of, ReplaySubject, startWith} from "rxjs";
 import {catchError, distinctUntilChanged, map, switchMap, tap, throttleTime} from "rxjs/operators";
-import Fuse from "fuse.js";
+import Fuse, {FuseResult} from "fuse.js";
 import {IFilterServiceState} from "../filtering/filter-service";
 import {
   GridData, GridDataConfig, HiddenSearchColumn, HiddenSortColumn, ListAction, ListActionConfig, ListData,
@@ -8,10 +8,9 @@ import {
 } from "./list-data";
 import {ISorted, sortByIndexAsc} from "../lib/index-sort";
 import {DetachedSearchData} from "../models/detached-search";
-import {applyQueryParam, arrToMap, mapArr, mapToArr, SimpleObject, SortFn, WithId} from "@juulsgaard/ts-tools";
+import {applyQueryParam, arrToMap, mapArrNotNull, mapToArr, SimpleObject, SortFn, WithId} from "@juulsgaard/ts-tools";
 import {Page, Sort} from "../lib/types";
 import {cache, mapListChanged, persistentCache} from "@juulsgaard/rxjs-tools";
-import FuseResult = Fuse.FuseResult;
 
 export class ListDataSource<TModel extends WithId> {
 
@@ -328,9 +327,9 @@ export class ListDataSource<TModel extends WithId> {
 
   //<editor-fold desc="Map To Universal">
   mapToUniversal(row: TModel): ListUniversalData<TModel> {
-    const actions = mapArr(this.options.actions, action => this.mapAction(row, action));
+    const actions = mapArrNotNull(this.options.actions, action => this.mapAction(row, action));
 
-    const flags = mapArr(this.options.flags, f => {
+    const flags = mapArrNotNull(this.options.flags, f => {
       const active = f.filter(row);
       const icon = active ? f.icon : f.inactiveIcon;
       const name = active ? f.name : f.inactiveName ?? f.name;

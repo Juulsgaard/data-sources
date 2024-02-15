@@ -15,7 +15,7 @@ import {BulkRelocateModel, MoveModel} from "../models/move";
 import {cache, persistentCache} from "@juulsgaard/rxjs-tools";
 import {DetachedSearchData} from "../models/detached-search";
 import {
-  applySelector, arrToLookup, arrToMap, mapArr, mapToArr, SimpleObject, SortFn, titleCase, WithId
+  applySelector, arrToLookup, arrToMap, mapArrNotNull, mapToArr, SimpleObject, SortFn, titleCase, WithId
 } from "@juulsgaard/ts-tools";
 import {Sort} from "../lib/types";
 
@@ -577,7 +577,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
       folder.folders = subFolders;
     }
 
-    const root = folderLookup.get(null) ?? [];
+    const root = folderLookup.get(undefined) ?? [];
 
     for (let folder of root) {
       this.populateDeepFolder(folder, []);
@@ -619,7 +619,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
   //<editor-fold desc="Action Mapping">
 
   private mapFolderActions(folder: TreeFolder<TFolder, TItem>): TreeFolderAction<TFolder, TItem>[] {
-    return mapArr(
+    return mapArrNotNull(
       this.options.folderActions,
       (config): TreeFolderAction<TFolder, TItem>|undefined => {
         if (!config.action && !config.route) return undefined;
@@ -635,7 +635,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
   }
 
   private mapItemActions(item: TreeItem<TFolder, TItem>): TreeItemAction<TFolder, TItem>[] {
-    return mapArr(
+    return mapArrNotNull(
       this.options.itemActions,
       (config): TreeItemAction<TFolder, TItem>|undefined => {
         if (!config.action && !config.route) return undefined;
@@ -655,7 +655,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
   //<editor-fold desc="Flag Mapping">
 
   private mapFolderFlags(folder: TreeFolder<TFolder, TItem>): TreeFlag[] {
-    return mapArr(
+    return mapArrNotNull(
       this.options.folderFlags,
       (config): TreeFlag | undefined => {
 
@@ -670,7 +670,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
   }
 
   private mapItemFlags(item: TreeItem<TFolder, TItem>): TreeFlag[] {
-    return mapArr(
+    return mapArrNotNull(
       this.options.itemFlags,
       (config): TreeFlag | undefined => {
 
