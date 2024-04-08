@@ -7,7 +7,8 @@ export default [
 			dir: 'dist',
 			format: "esm",
 			preserveModules: true,
-		}
+		},
+		external: ['@juulsgaard/ts-tools', 'rxjs', 'rxjs/operators', '@juulsgaard/rxjs-tools', 'fuse.js']
 	},
 	{
 		input: 'out/index.d.ts',
