@@ -1,6 +1,6 @@
-import {asyncScheduler, BehaviorSubject, combineLatest, merge, Observable, of, ReplaySubject, startWith} from "rxjs";
-import {catchError, distinctUntilChanged, map, switchMap, tap, throttleTime} from "rxjs/operators";
-import Fuse, {FuseResult} from "fuse.js";
+import {BehaviorSubject, EMPTY, Observable, of} from "rxjs";
+import {catchError, switchMap} from "rxjs/operators";
+import Fuse from "fuse.js";
 import {IFilterServiceState} from "../filtering/filter-service";
 import {
   GridData, GridDataConfig, HiddenSearchColumn, HiddenSortColumn, ListAction, ListActionConfig, ListData,
@@ -8,43 +8,45 @@ import {
 } from "./list-data";
 import {ISorted, sortByIndexAsc} from "../lib/index-sort";
 import {DetachedSearchData} from "../models/detached-search";
-import {applyQueryParam, arrToMap, mapArrNotNull, mapToArr, SimpleObject, SortFn, WithId} from "@juulsgaard/ts-tools";
+import {
+  applyQueryParam, arrToMap, isNumber, mapArrNotNull, mapToArr, SimpleObject, SortFn, WithId
+} from "@juulsgaard/ts-tools";
 import {Page, Sort} from "../lib/types";
-import {cache, latestValueFromOrDefault, mapListChanged, persistentCache} from "@juulsgaard/rxjs-tools";
+import {
+  assertInInjectionContext, computed, DestroyRef, effect, inject, Injector, signal, Signal, untracked
+} from "@angular/core";
+import {takeUntilDestroyed, toObservable} from "@angular/core/rxjs-interop";
+import {searchSignal} from "../lib/signals";
+
+interface Outputs<T> {
+  simple: Signal<ListUniversalData<T>[]>;
+  table: Signal<TableData<T>[]>;
+  list: Signal<ListData<T>[]>;
+  grid: Signal<GridData<T>[]>;
+}
 
 export class ListDataSource<TModel extends WithId> {
 
-  public columnIds: string[];
-  public columns: TableColumn<TModel, any>[];
+  public readonly columnIds: string[];
+  public readonly columns: TableColumn<TModel, any>[];
 
-  public sortOptions: SortOption[];
-  private sortLookup: Map<string, SortFn<TModel>>;
-  private searchKeys: {weight?: number, key: string}[] = [];
+  public readonly sortOptions: SortOption[];
+  private readonly sortLookup: Map<string, SortFn<TModel>>;
+  private readonly searchKeys: {weight?: number, key: string}[] = [];
 
-  public paginated: boolean;
-  public indexSorted: boolean;
+  public readonly paginated: boolean;
+  public readonly indexSorted: boolean;
 
-  public gridFallbackImage?: string;
-  public listFallbackImage?: string;
+  public readonly gridFallbackImage?: string;
+  public readonly listFallbackImage?: string;
 
   //<editor-fold desc="Outputs">
-  public simpleData$: Observable<ListUniversalData<TModel>[]>;
-  public tableData$: Observable<TableData<TModel>[]>;
-  public listData$: Observable<ListData<TModel>[]>;
-  public gridData$: Observable<GridData<TModel>[]>;
-
-  public simpleSearchData$: Observable<ListUniversalData<TModel>[]>;
-  public tableSearchData$: Observable<TableData<TModel>[]>;
-  public listSearchData$: Observable<ListData<TModel>[]>;
-  public gridSearchData$: Observable<GridData<TModel>[]>;
-
-  public simpleDisplayData$: Observable<ListUniversalData<TModel>[]>;
-  public tableDisplayData$: Observable<TableData<TModel>[]>;
-  public listDisplayData$: Observable<ListData<TModel>[]>;
-  public gridDisplayData$: Observable<GridData<TModel>[]>;
-
-  public itemLookup$: Observable<Map<string, TModel>>;
+  public readonly data: Outputs<TModel>;
+  public readonly displayData: Outputs<TModel>;
+  public readonly searchData: Outputs<TModel>;
   //</editor-fold>
+
+  private readonly onDestroy: DestroyRef;
 
   constructor(
     private readonly options: ListDataSourceOptions<TModel>,
@@ -53,7 +55,12 @@ export class ListDataSource<TModel extends WithId> {
     private readonly sortColumns: Map<string, HiddenSortColumn<TModel, any>>,
     private readonly listConfig?: ListDataConfig<TModel>,
     private readonly gridConfig?: GridDataConfig<TModel>,
+    private readonly injector?: Injector
   ) {
+
+    if (!this.injector) assertInInjectionContext(ListDataSource);
+
+    this.onDestroy = this.injector?.get(DestroyRef) ?? inject(DestroyRef);
 
     this.columns = mapToArr(tableColumns);
 
@@ -73,7 +80,7 @@ export class ListDataSource<TModel extends WithId> {
       this.sortLookup.set(id, col.sortFn);
 
       if (col.defaultSort) {
-        this.sorting$.next({direction: options.defaultSortOrder, active: id});
+        this._sorting.set({direction: options.defaultSortOrder, active: id});
       }
     }
 
@@ -90,7 +97,7 @@ export class ListDataSource<TModel extends WithId> {
       }
 
       if (col.defaultSort) {
-        this.sorting$.next({direction: options.defaultSortOrder, active: col.id});
+        this._sorting.set({direction: options.defaultSortOrder, active: col.id});
       }
 
       if (col.searchable) {
@@ -106,166 +113,99 @@ export class ListDataSource<TModel extends WithId> {
       this.columnIds.push('_flags');
     }
 
-    this._page$ = new BehaviorSubject<Pagination>({page: 0, pageSize: options.pageSize});
-    this.page$ = this._page$.asObservable();
-
-    this.filter$ = this.options.filterService?.filter$ ?? of(undefined)
+    this.filterState = this.options.filterService?.filter ?? signal(undefined)
     //</editor-fold>
 
-    //<editor-fold desc="Setup Observables">
-
-    // Items
-    this.items$ = merge(
-      this._items$,
-      this._itemSources$.pipe(switchMap(x => x))
-    ).pipe(cache());
-
-    this.itemLookup$ = this.items$.pipe(
-      map(list => arrToMap(list, x => x.id, x => x)),
-      cache()
-    );
-
-    // State
-    this.empty$ = this.items$.pipe(map(x => !x.length), startWith(true), distinctUntilChanged());
-
+    //<editor-fold desc="Setup Pipeline">
 
     // Filtering
-    const filtered$ = combineLatest([this.items$, this.filter$, this.blackList$, this._recalculate$]).pipe(
-      map(([x, filter, blacklist]) => this.filter(x, filter, blacklist)),
-      map(list => this.indexSort(list)),
-      tap(list => this.updatePage(list.length))
-    );
+    this.filteredItems = computed(() => this.filterItems(this.items()));
 
-    const activeFilter$ = this.options.filterService?.activeFilters$?.pipe(
-      map(x => x > 0),
-      distinctUntilChanged(),
-      cache()
-    ) ?? of(false);
+    const filterActive = computed(() => {
+      const activeCount = this.options.filterService?.activeFilters() ?? 0;
+      return activeCount > 0;
+    });
 
-    this.filterActive$ = combineLatest([this.blackList$, activeFilter$]).pipe(
-      map(([blacklist, filtered]) => !!blacklist.length || filtered),
-      cache()
-    );
+    this.filterActive = computed(() => this.blacklist().length > 0 || filterActive());
 
     //Search Query
-    const searchQuery$ = this.searchQuery$.pipe(
-      throttleTime(800, asyncScheduler, {leading: false, trailing: true}),
-      startWith(undefined),
-      distinctUntilChanged(),
-      cache()
-    );
+    const query = searchSignal(this.searchQuery, 1000, 300, {injector: this.injector});
+    this.searching = computed(() => !!query()?.length);
 
-    this.searching$ = searchQuery$.pipe(
-      map(x => !!x?.length),
-      distinctUntilChanged(),
-      cache()
-    );
-
-    // Setup search
-    this.preSearchData$ = filtered$.pipe(
-      mapListChanged(this.mapToSearch.bind(this), this.options.pureMapping),
-      tap(list => this.setupSearch(list)),
-      cache()
-    );
+    // Setup Search
+    this.preSearchData = computed(() => this.mapToSearch(this.filteredItems()));
+    this.searcher = computed(() => this.getSearcher(this.preSearchData()));
 
     // Search
-    const searchData$ = combineLatest([
-      this.preSearchData$,
-      searchQuery$
-    ]).pipe(
-      map(([, query]) => this.search(query ?? '')),
-      map(list => list.map(x => x.item.model))
-    );
-
-    const listMap = this.listConfig
-      ? mapListChanged(this.mapToList.bind(this), this.options.pureMapping)
-      : map(() => []);
-
-    const gridMap = this.gridConfig
-      ? mapListChanged(this.mapToGrid.bind(this), this.options.pureMapping)
-      : map(() => []);
+    const searchData = computed(() => this.search(query()));
 
     // Search output
-    this.simpleSearchData$ = searchData$.pipe(
-      mapListChanged(this.mapToUniversal.bind(this), this.options.pureMapping),
-      persistentCache(500)
-    );
+    const universalSearchData = computed(() => this.mapToUniversal(searchData()));
 
-    this.tableSearchData$ = this.simpleSearchData$.pipe(
-      mapListChanged(this.mapToTable.bind(this), this.options.pureMapping),
-      cache(),
-    );
-
-    this.listSearchData$ = this.simpleSearchData$.pipe(
-      listMap,
-      cache(),
-    );
-
-    this.gridSearchData$ = this.simpleSearchData$.pipe(
-      gridMap,
-      cache()
-    );
+    this.searchData = {
+      simple: universalSearchData,
+      table: computed(() => this.mapToTable(universalSearchData())),
+      grid: computed(() => this.mapToGrid(universalSearchData())),
+      list: computed(() => this.mapToList(universalSearchData())),
+    };
 
     // Sorting
-    const sorted$ = combineLatest([filtered$, this.sorting$]).pipe(
-      map(([list, sort]) => this.sort(list, sort)),
-      cache()
-    );
+    this.processedItems = computed(() => this.sortItems(this.filteredItems()));
 
     // Pagination
-    const paginated$ = combineLatest([sorted$, this._page$]).pipe(
-      map(([list, page]) => this.paginate(list, page))
-    )
+    // Update page number if out of bounds
+    effect(() => this.updatePage(), {allowSignalWrites: true, injector: this.injector});
+
+    this.paginatedItems = computed(() => this.paginate(this.processedItems()));
 
     // Outputs
-    this.filteredItems$ = sorted$;
 
-    this.simpleData$ = paginated$.pipe(
-      mapListChanged(this.mapToUniversal.bind(this), this.options.pureMapping),
-      persistentCache(500)
-    );
+    const universalData = computed(() => this.mapToUniversal(this.processedItems()));
 
-    this.tableData$ = this.simpleData$.pipe(
-      mapListChanged(this.mapToTable.bind(this), this.options.pureMapping),
-      cache(),
-    );
+    this.data = {
+      simple: universalData,
+      table: computed(() => this.mapToTable(universalData())),
+      grid: computed(() => this.mapToGrid(universalData())),
+      list: computed(() => this.mapToList(universalData())),
+    };
 
-    this.listData$ = this.simpleData$.pipe(
-      listMap,
-      cache(),
-    );
-
-    this.gridData$ = this.simpleData$.pipe(
-      gridMap,
-      cache()
-    );
-
-    this.simpleDisplayData$ = this.searching$.pipe(
-      switchMap((x) => x ? this.simpleSearchData$ : this.simpleData$)
-    );
-    this.tableDisplayData$ = this.searching$.pipe(
-      switchMap((x) => x ? this.tableSearchData$ : this.tableData$)
-    );
-    this.listDisplayData$ = this.searching$.pipe(
-      switchMap((x) => x ? this.listSearchData$ : this.listData$)
-    );
-    this.gridDisplayData$ = this.searching$.pipe(
-      switchMap((x) => x ? this.gridSearchData$ : this.gridData$)
-    );
+    this.displayData = {
+      simple: computed(() => this.searching() ? this.searchData.simple() : this.data.simple()),
+      table: computed(() => this.searching() ? this.searchData.table() : this.data.table()),
+      grid: computed(() => this.searching() ? this.searchData.grid() : this.data.grid()),
+      list: computed(() => this.searching() ? this.searchData.list() : this.data.list()),
+    };
     //</editor-fold>
+
+    // Map observable items to item signal
+    this.itemSources$.pipe(
+      switchMap(x => x ?? EMPTY),
+      takeUntilDestroyed(this.onDestroy),
+      catchError(() => of([] as TModel[]))
+    ).subscribe(val => this.setItems(val));
   }
 
   //<editor-fold desc="Item Population">
-  private readonly _items$ = new ReplaySubject<TModel[]>(1);
-  private readonly _itemSources$ = new ReplaySubject<Observable<TModel[]>>(1);
-  private readonly _recalculate$ = new BehaviorSubject<void>(undefined);
+  private readonly _items = signal<TModel[]>([]);
+  private readonly itemSources$ = new BehaviorSubject<Observable<TModel[]>|undefined>(undefined);
 
-  public get items(): TModel[] {return latestValueFromOrDefault(this.items$, [])}
-  public readonly items$: Observable<TModel[]>;
-  public readonly filteredItems$: Observable<TModel[]>;
+  public readonly items: Signal<TModel[]> = this._items.asReadonly();
+  public readonly items$: Observable<TModel[]> = toObservable(this._items);
 
-  public get empty() {return this.items.length <= 0}
-  public readonly empty$: Observable<boolean>;
+  public readonly length = computed(() => this.items().length);
+  public readonly filteredLength = computed(() => this.filteredItems().length);
+
+  public readonly empty: Signal<boolean> = computed(() => this.length() <= 0);
+  public readonly itemLookup: Signal<Map<string, TModel>> = computed(() => arrToMap(this.items(), x => x.id));
+
+  /** A list of models after filtering **/
+  public readonly filteredItems: Signal<TModel[]>;
+
+  /** A list of models after filtering and sorting **/
+  public readonly processedItems: Signal<TModel[]>;
+
+  /** A list of models after filtering, sorting and pagination **/
+  public readonly paginatedItems: Signal<TModel[]>;
 
 
   /**
@@ -273,55 +213,56 @@ export class ListDataSource<TModel extends WithId> {
    * @param items
    */
   setItems(items: TModel[]) {
-    this._items$.next(items);
+    this._items.set(items);
   }
 
   /**
    * Populate the data source via observable
    * @param items$
    */
-  setItems$(items$: Observable<TModel[]>) {
-    this._itemSources$.next(items$.pipe(catchError(() => of([]))));
+  setItems$(items$: Observable<TModel[]>|undefined) {
+    this.itemSources$.next(items$);
   }
 
   /**
    * Trigger a re-calculation of the data source pipeline
    */
   recalculate() {
-    this._recalculate$.next();
+    this.setItems([...untracked(this.items)]);
   }
 
   //</editor-fold>
 
   //<editor-fold desc="Filtering">
-  private filter$: Observable<IFilterServiceState<TModel> | undefined>;
-  public filterActive$: Observable<boolean>;
+  private readonly filterState: Signal<IFilterServiceState<TModel> | undefined>;
+  public readonly filterActive: Signal<boolean>;
 
-  private blackList$ = new BehaviorSubject<string[]>([]);
+  private blacklist = signal<string[]>([]);
 
   /**
    * Define a list of Ids that will be removed from the final result
    * @param ids
    */
-  set blackList(ids: string[] | undefined) {
-    this.blackList$.next(ids ?? []);
+  setBlacklist(ids: string[] | undefined) {
+    this.blacklist.set(ids ?? []);
   }
 
   /**
    * Apply the blacklist / service filter in the pipeline
    * @param list - The data
-   * @param filter - A filter from the Filter Service
-   * @param blacklist - A blacklist to exclude
    * @private
    */
-  private filter(list: TModel[] | undefined, filter: IFilterServiceState<TModel> | undefined, blacklist: string[]): TModel[] {
+  private filterItems(list: TModel[]): TModel[] {
+    if (list.length <= 0) return list;
 
-    if (!list?.length) return [];
+    const blacklist = this.blacklist();
 
     if (blacklist?.length) {
       const set = new Set<string>(blacklist);
       list = list.filter(x => !set.has(x.id));
     }
+
+    const filter = this.filterState();
 
     if (!filter) return list;
     return filter.filter(list);
@@ -330,72 +271,79 @@ export class ListDataSource<TModel extends WithId> {
   //</editor-fold>
 
   //<editor-fold desc="Map To Universal">
-  mapToUniversal(row: TModel): ListUniversalData<TModel> {
-    const actions = mapArrNotNull(this.options.actions, action => this.mapAction(row, action));
+  mapToUniversal(list: TModel[]): ListUniversalData<TModel>[] {
+    return list.map(item => {
+      const actions = mapArrNotNull(this.options.actions, action => this.mapAction(item, action));
 
-    const flags = mapArrNotNull(this.options.flags, f => {
-      const active = f.filter(row);
-      const icon = active ? f.icon : f.inactiveIcon;
-      const name = active ? f.name : f.inactiveName ?? f.name;
-      return icon ? {icon, name} as ListFlag : null;
+      const flags = mapArrNotNull(this.options.flags, f => {
+        const active = f.filter(item);
+        const icon = active ? f.icon : f.inactiveIcon;
+        const name = active ? f.name : f.inactiveName ?? f.name;
+        return icon ? {icon, name} as ListFlag : null;
+      });
+
+      const cssClasses = this.options.cssClasses
+        .filter(style => style.condition(item))
+        .map(x => x.cssClass)
+
+      return {model: item, actions, flags, cssClasses};
     });
-
-    const cssClasses = this.options.cssClasses
-      .filter(style => style.condition(row))
-      .map(x => x.cssClass)
-
-    return {model: row, actions, flags, cssClasses};
   }
   //</editor-fold>
 
   //<editor-fold desc="Map to Table">
   /**
    * Map the raw data to a table format with data as defined by the config
-   * @param row - The raw data
+   * @param list - The raw data
    * @private
    */
-  private mapToTable(row: ListUniversalData<TModel>): TableData<TModel> {
-    const data = {} as SimpleObject;
-    this.tableColumns.forEach(col => {
-      data[col.id] = col.mapData(row.model);
-    });
+  private mapToTable(list: ListUniversalData<TModel>[]): TableData<TModel>[] {
+    return list.map(item => {
+      const data = {} as SimpleObject;
+      this.tableColumns.forEach(col => {
+        data[col.id] = col.mapData(item.model);
+      });
 
-    return {
-      ...row,
-      id: row.model.id,
-      data
-    };
+      return {
+        ...item,
+        id: item.model.id,
+        data
+      };
+    })
   }
 
   //</editor-fold>
 
   //<editor-fold desc="Search">
-  searchQuery$ = new BehaviorSubject<string | undefined>(undefined);
-  private preSearchData$: Observable<ListSearchData<TModel>[]>;
-  private searcher?: Fuse<ListSearchData<TModel>>;
+  readonly searchQuery = signal<string|undefined>(undefined);
+  private readonly preSearchData: Signal<ListSearchData<TModel>[]>;
+  private _searcher?: Fuse<ListSearchData<TModel>>;
+  private readonly searcher: Signal<Fuse<ListSearchData<TModel>>>;
   private searchResultLimit = 200;
 
-  searching$: Observable<boolean>;
+  readonly searching: Signal<boolean>;
 
   /**
    * Add a search map to model
-   * @param row - data model
+   * @param list - data models
    */
-  mapToSearch(row: TModel): ListSearchData<TModel> {
-    const search: Record<string, string> = {};
+  mapToSearch(list: TModel[]): ListSearchData<TModel>[] {
+    return list.map(item => {
+      const search: Record<string, string> = {};
 
-    for (let [id, col] of this.tableColumns) {
-      if (!col.searchable) continue;
-      const val = col.mapData(row)?.toString();
-      if (val !== undefined) search[id] = val;
-    }
+      for (let [id, col] of this.tableColumns) {
+        if (!col.searchable) continue;
+        const val = col.mapData(item)?.toString();
+        if (val !== undefined) search[id] = val;
+      }
 
-    for (let [id, col] of this.searchColumns) {
-      const val = col.mapData(row);
-      if (val !== undefined) search[id] = val;
-    }
+      for (let [id, col] of this.searchColumns) {
+        const val = col.mapData(item);
+        if (val !== undefined) search[id] = val;
+      }
 
-    return {model: row, search};
+      return {model: item, search};
+    });
   }
 
   /**
@@ -403,20 +351,23 @@ export class ListDataSource<TModel extends WithId> {
    * @param list
    * @private
    */
-  private setupSearch(list: ListSearchData<TModel>[]) {
-    if (!this.searcher) {
-      this.searcher = new Fuse<ListSearchData<TModel>>(list, {
-        includeScore: true,
-        shouldSort: true,
-        keys: this.searchKeys.map(({key, weight}) => ({
-          name: ['search', key],
-          weight: weight ?? 1
-        }))
-      });
-      return;
+  private getSearcher(list: ListSearchData<TModel>[]): Fuse<ListSearchData<TModel>> {
+
+    if (this._searcher) {
+      this._searcher.setCollection(list);
+      return this._searcher;
     }
 
-    this.searcher.setCollection(list);
+    this._searcher = new Fuse<ListSearchData<TModel>>(list, {
+      includeScore: true,
+      shouldSort: true,
+      keys: this.searchKeys.map(({key, weight}) => ({
+        name: ['search', key],
+        weight: weight ?? 1
+      }))
+    });
+
+    return this._searcher;
   }
 
   /**
@@ -425,8 +376,10 @@ export class ListDataSource<TModel extends WithId> {
    * @param limit
    * @private
    */
-  private search(query: string, limit?: number): FuseResult<ListSearchData<TModel>>[] {
-    return this.searcher!.search(query, {limit: limit ?? this.searchResultLimit});
+  private search(query: string|undefined, limit?: number): TModel[] {
+    if (!query) return this.preSearchData().map(x => x.model);
+    const result = this.searcher().search(query ?? '', {limit: limit ?? this.searchResultLimit});
+    return result.map(x => x.item.model);
   }
 
   //</editor-fold>
@@ -435,10 +388,10 @@ export class ListDataSource<TModel extends WithId> {
 
   /**
    * Generate a detached search feed with a dedicated query
-   * @param query$ - The dedicated query
+   * @param searchQuery - The dedicated query (should be throttled if coming from user input)
    * @param limit - Limit the amount of search results
    */
-  getDetachedSearch(query$: Observable<string>, limit = 20): Observable<DetachedSearchData<TModel>[]> {
+  getDetachedSearch(searchQuery: Signal<string>, limit = 20): Signal<DetachedSearchData<TModel>[]> {
 
     if (!this.listConfig) {
       if (!this.gridConfig) {
@@ -458,29 +411,29 @@ export class ListDataSource<TModel extends WithId> {
       ? (item: TModel) => this.listConfig!.secondLine?.(item)
       : (item: TModel) => this.gridConfig!.subTitle?.(item);
 
-    return combineLatest([this.preSearchData$, query$]).pipe(
-      map(([, query]) => this.search(query ?? '', limit)),
-      map(list => list.map(x => ({
+    return computed(() => {
+
+      const query = searchQuery();
+      if (!query) return [];
+
+      const result = this.searcher().search(query ?? '', {limit});
+      return result.map(x => ({
         id: x.item.model.id,
         model: x.item.model,
         name: getName(x.item.model),
         icon: getIcon(x.item.model),
         extra: getExtra(x.item.model),
-        score: x.score,
-      } as DetachedSearchData<TModel>))),
-      cache()
-    );
+        score: x.score ?? 0,
+      } satisfies DetachedSearchData<TModel>));
+    });
   }
 
   //</editor-fold>
 
   //<editor-fold desc="Sorting">
-  private static defaultSorting: Sort = {active: '', direction: 'asc'};
-  private sorting$ = new BehaviorSubject<Sort>(ListDataSource.defaultSorting);
-
-  get sorting() {
-    return this.sorting$.value
-  }
+  private static readonly defaultSorting: Sort = {active: '', direction: 'asc'};
+  private readonly _sorting = signal(ListDataSource.defaultSorting);
+  private readonly sorting = this._sorting.asReadonly();
 
   /**
    * Sort the data according to the index
@@ -497,15 +450,15 @@ export class ListDataSource<TModel extends WithId> {
    * Apply the selected sorting
    * If no sorting is supplied then the list is returned as is
    * @param list
-   * @param sort
    * @private
    */
-  private sort(list: TModel[], sort: Sort): TModel[] {
-    if (!sort.active?.length) return list;
-    if (!sort.direction.length) return list;
+  private sortItems(list: TModel[]): TModel[] {
+
+    const sort = this.sorting();
+    if (!sort.active?.length || !sort.direction.length) return this.indexSort(list);
 
     const sortFn = this.sortLookup.get(sort.active);
-    if (!sortFn) return list;
+    if (!sortFn) return this.indexSort(list);
 
     return [...list].sort(sort.direction == 'asc' ? sortFn : (a, b) => -1 * sortFn(a, b));
   }
@@ -515,7 +468,7 @@ export class ListDataSource<TModel extends WithId> {
    * @param sort
    */
   setSort(sort?: Sort) {
-    this.sorting$.next(sort ?? ListDataSource.defaultSorting);
+    this._sorting.set(sort ?? ListDataSource.defaultSorting);
   }
 
   //</editor-fold>
@@ -523,19 +476,23 @@ export class ListDataSource<TModel extends WithId> {
   //<editor-fold desc="Map to List">
   /**
    * Map the table data to the more compact List data
-   * @param item - Row data
+   * @param list - Row data
    * @private
    */
-  private mapToList(item: ListUniversalData<TModel>): ListData<TModel> {
-    const icon = this.listConfig!.icon?.(item.model);
-    return {
-      ...item,
-      id: item.model.id,
-      firstLine: this.listConfig!.firstLine(item.model),
-      secondLine: this.listConfig!.secondLine?.(item.model),
-      avatar: this.getImageUrl(item.model, !icon ? this.listConfig!.avatarPlaceholder : undefined, this.listConfig!.avatar, this.listConfig!.avatarCacheBuster),
-      icon: icon
-    }
+  private mapToList(list: ListUniversalData<TModel>[]): ListData<TModel>[] {
+    if (!this.listConfig) return [];
+
+    return list.map(item => {
+      const icon = this.listConfig!.icon?.(item.model);
+      return {
+        ...item,
+        id: item.model.id,
+        firstLine: this.listConfig!.firstLine(item.model),
+        secondLine: this.listConfig!.secondLine?.(item.model),
+        avatar: this.getImageUrl(item.model, !icon ? this.listConfig!.avatarPlaceholder : undefined, this.listConfig!.avatar, this.listConfig!.avatarCacheBuster),
+        icon: icon
+      }
+    });
   }
 
   //</editor-fold>
@@ -543,20 +500,21 @@ export class ListDataSource<TModel extends WithId> {
   //<editor-fold desc="Map to Grid">
   /**
    * Map the table data to the re-orderable grid data
-   * @param item
+   * @param list
    */
-  private mapToGrid(item: ListUniversalData<TModel>): GridData<TModel> {
-    const icon = this.gridConfig!.icon?.(item.model);
-
-    return {
-      ...item,
-      id: item.model.id,
-      title: this.gridConfig!.title(item.model),
-      subTitle: this.gridConfig!.subTitle?.(item.model),
-      image: this.getImageUrl(item.model, !icon ? this.gridConfig!.imagePlaceholder : undefined, this.gridConfig!.image, this.gridConfig!.imageCacheBuster),
-      icon: icon,
-      index: (item.model as Partial<ISorted>).index
-    }
+  private mapToGrid(list: ListUniversalData<TModel>[]): GridData<TModel>[] {
+    return list.map(item => {
+      const icon = this.gridConfig!.icon?.(item.model);
+      return {
+        ...item,
+        id: item.model.id,
+        title: this.gridConfig!.title(item.model),
+        subTitle: this.gridConfig!.subTitle?.(item.model),
+        image: this.getImageUrl(item.model, !icon ? this.gridConfig!.imagePlaceholder : undefined, this.gridConfig!.image, this.gridConfig!.imageCacheBuster),
+        icon: icon,
+        index: (item.model as Partial<ISorted>).index
+      }
+    });
   }
 
   //</editor-fold>
@@ -598,53 +556,56 @@ export class ListDataSource<TModel extends WithId> {
   //</editor-fold>
 
   //<editor-fold desc="Pagination">
-  private _page$: BehaviorSubject<Pagination>;
-  readonly page$: Observable<Pagination>;
-
-  /**
-   * The current pagination page
-   */
-  get page() {
-    return this._page$.value
-  }
-
-  private _length$ = new BehaviorSubject(0);
-  readonly length$ = this._length$.asObservable();
-  get length() {
-    return this._length$.value
-  }
+  private readonly _page = signal<Pagination>({page: 0, pageSize: this.options.pageSize});
+  public readonly page = this._page.asReadonly();
 
   /**
    * Re-calculate pagination based on the length of the content list
-   * @param listLength
    * @private
    */
-  private updatePage(listLength: number) {
-    this._length$.next(listLength);
-    const page = this._page$.value;
-    if (listLength == 0 || listLength > page.page * page.pageSize) return;
+  private updatePage() {
+    const length = this.filteredLength();
+    if (length == 0) return;
 
-    this._page$.next({pageSize: page.pageSize, page: Math.floor((listLength - 1) / page.pageSize)});
+    const page = this.page();
+    if (page.page == 0) return;
+
+    if (length > page.page * page.pageSize) return;
+
+    this._page.set({pageSize: page.pageSize, page: Math.floor((length - 1) / page.pageSize)});
   }
 
   /**
    * Apply pagination to the data
    * @param list
-   * @param pagination
    * @private
    */
-  private paginate<TList>(list: TList[], pagination: Pagination): TList[] {
+  private paginate<TList>(list: TList[]): TList[] {
+    if (list.length <= 0) return list;
     if (!this.options.paginated) return list;
+
+    const pagination = this.page();
     return list.slice(pagination.page * pagination.pageSize, (pagination.page + 1) * pagination.pageSize);
   }
 
   /**
    * Change the location of the pagination
+   * @param pageIndex
+   */
+  public setPage(pageIndex: number): void;
+  /**
+   * Change the location of the pagination
    * @param pageSize
    * @param pageIndex
    */
-  public setPage({pageSize, pageIndex}: Page) {
-    this._page$.next({page: pageIndex, pageSize});
+  public setPage({pageSize, pageIndex}: Page): void;
+  public setPage(page: Page|number) {
+
+    const pagination = isNumber(page)
+      ? {pageSize: untracked(this.page).pageSize, page}
+      : {pageSize: page.pageSize, page: page.pageIndex};
+
+    this._page.set(pagination);
   }
 
   //</editor-fold>
@@ -659,5 +620,3 @@ interface SortOption {
   id: string;
   name: string;
 }
-
-

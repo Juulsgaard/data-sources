@@ -11,6 +11,7 @@ import {getRenderDataTypeSorting, getSortingTypeSorting} from "../lib/sorting";
 import {
   arrToObj, getSelectorFn, isString, KeysOfTypeOrNull, lowerFirst, MapFunc, SortFn, WithId
 } from "@juulsgaard/ts-tools";
+import {Injector} from "@angular/core";
 
 
 type TableColumnConfigs<TModel extends WithId> = {
@@ -84,11 +85,6 @@ export interface IListDataSourceConfig<TModel extends WithId> {
   hasIndexSorting(): this;
 
   /**
-   * Use pure mapping if bindings are pure
-   */
-  isPure(): this;
-
-  /**
    * Add pagination to the data source
    * @param pageSize
    */
@@ -115,14 +111,19 @@ export interface IListDataSourceConfig<TModel extends WithId> {
 //<editor-fold desc="Main Config">
 export class ListDataSourceConfig<TModel extends WithId> implements IListDataSourceConfig<TModel> {
 
-  tableColumns: Map<string, TableColumn<TModel, any>> = new Map<string, TableColumn<TModel, any>>();
-  searchColumns: Map<string, HiddenSearchColumn<TModel>> = new Map<string, HiddenSearchColumn<TModel>>();
-  sortColumns: Map<string, HiddenSortColumn<TModel, any>> = new Map<string, HiddenSortColumn<TModel, any>>();
+  /** @internal **/
+  readonly tableColumns: Map<string, TableColumn<TModel, any>> = new Map<string, TableColumn<TModel, any>>();
+  /** @internal **/
+  readonly searchColumns: Map<string, HiddenSearchColumn<TModel>> = new Map<string, HiddenSearchColumn<TModel>>();
+  /** @internal **/
+  readonly sortColumns: Map<string, HiddenSortColumn<TModel, any>> = new Map<string, HiddenSortColumn<TModel, any>>();
 
+  /** @internal **/
   listConfig?: ListDataConfig<TModel>;
+  /** @internal **/
   gridConfig?: GridDataConfig<TModel>;
+  /** @internal **/
   options: ListDataSourceOptions<TModel> = {
-    pureMapping: false,
     paginated: false,
     pageSize: 40,
     actions: [],
@@ -132,11 +133,16 @@ export class ListDataSourceConfig<TModel extends WithId> implements IListDataSou
     defaultSortOrder: 'asc'
   };
 
-  table: TableColumnConfigs<TModel>;
-  search: SearchColumnConfig<TModel>;
-  sort: SortColumnConfigs<TModel>;
+  readonly table: TableColumnConfigs<TModel>;
+  readonly search: SearchColumnConfig<TModel>;
+  readonly sort: SortColumnConfigs<TModel>;
 
-  constructor() {
+  private readonly injector?: Injector;
+
+  constructor(options?: {injector?: Injector}) {
+
+    this.injector = options?.injector;
+
     this.table = arrToObj(
       Object.entries(RenderDataTypes),
       ([key, _]) => lowerFirst(key),
@@ -199,13 +205,8 @@ export class ListDataSourceConfig<TModel extends WithId> implements IListDataSou
     return this;
   }
 
-  isPure() {
-    this.options.pureMapping = true;
-    return this;
-  }
-
   finish() {
-    return new ListDataSource<TModel>(this.options, this.tableColumns, this.searchColumns, this.sortColumns, this.listConfig, this.gridConfig);
+    return new ListDataSource<TModel>(this.options, this.tableColumns, this.searchColumns, this.sortColumns, this.listConfig, this.gridConfig, this.injector);
   }
 
   withPagination(pageSize?: number) {

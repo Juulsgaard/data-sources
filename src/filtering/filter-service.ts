@@ -1,10 +1,11 @@
-import {asyncScheduler, BehaviorSubject, debounceTime, EMPTY, Observable, startWith, Subscription} from "rxjs";
-import {catchError, distinctUntilChanged, map, skip, throttleTime} from "rxjs/operators";
 import {BaseTreeFolder, BaseTreeItem} from "../tree-source/tree-data";
 import {deepCopy} from "@juulsgaard/ts-tools";
 import {FilterAdapter, FilterReadState, FilterSaveState, MappedReadState} from "./filter-adapter";
 import {DataFilter, IndividualDataFilter} from "./data-filter";
-import {cache} from "@juulsgaard/rxjs-tools";
+import {
+  assertInInjectionContext, computed, DestroyRef, effect, inject, Injector, signal, Signal, untracked, WritableSignal
+} from "@angular/core";
+import {debouncedSignal} from "../lib/signals";
 
 export interface IFilterServiceState<TModel> {
   filter<T extends TModel>(list: T[]): T[];
@@ -32,54 +33,57 @@ export type ITreeItemFilterState<TItem> = IFilterServiceState<BaseTreeItem<TItem
 export type TreeItemFilterState<TFilter, TItem> = FilterServiceState<TFilter, BaseTreeItem<TItem>>;
 
 export interface IFilterService<TModel> {
-  activeFilters$: Observable<number>;
-  filter$: Observable<IFilterServiceState<TModel>>;
+  activeFilters: Signal<number>;
+  filter: Signal<IFilterServiceState<TModel>>;
 }
 
-export abstract class FilterService<TFilter, TModel> implements IFilterService<TModel> {
+export abstract class FilterService<TFilter extends Record<string, unknown>, TModel> implements IFilterService<TModel> {
+
+  private readonly onDestroy = inject(DestroyRef);
 
   private _filters: DataFilter<TFilter, TModel>[] = [];
 
-  filter$: Observable<FilterServiceState<TFilter, TModel>>;
-  activeFilters$: Observable<number>;
+  filter: Signal<FilterServiceState<TFilter, TModel>>;
+  activeFilters: Signal<number>;
 
   private readonly _resetState: TFilter;
 
-  private _state$: BehaviorSubject<TFilter>;
-  public state$: Observable<TFilter>;
+  private readonly _state: WritableSignal<TFilter>;
+  public readonly state: Signal<TFilter>;
+  public readonly debouncedState: Signal<TFilter>;
 
-  get state() {
-    return this._state$.value
+  setState(state: TFilter) {
+    this._state.set(state)
   }
 
-  set state(state: TFilter) {
-    this._state$.next(state)
-  }
-
-  set delta(state: Partial<TFilter>) {
-    this.state = {...this.state, ...state}
+  updateState(state: Partial<TFilter>) {
+    this.setState({...this.state(), ...state})
   };
+
+  protected modifyState(change: (state: TFilter) => Partial<TFilter>) {
+    const state = untracked(this.state);
+    const result = change(state);
+    if (state === result) return;
+    this.updateState(result);
+  }
 
   protected constructor(state: TFilter, private saveAdapter?: FilterAdapter) {
     this._resetState = deepCopy(state);
-    this._state$ = new BehaviorSubject(state);
-    this.state$ = this._state$.asObservable();
 
-    this.activeFilters$ = this.state$.pipe(
-      debounceTime(200),
-      startWith(this.state),
-      distinctUntilChanged(),
-      map(state => this._filters.reduce((acc, x) => x.isActive(state) ? acc + 1 : acc, 0)),
-      cache()
-    );
+    this._state = signal(state);
+    this.state = this._state.asReadonly();
 
-    this.filter$ = this.state$.pipe(
-      debounceTime(500),
-      startWith(this.state),
-      distinctUntilChanged(),
-      map(state => new FilterServiceState<TFilter, TModel>(state, this._filters)),
-      cache()
-    );
+    this.debouncedState = debouncedSignal(this.state, 500);
+
+    this.activeFilters = computed(() => {
+      const state = this.debouncedState();
+      return this._filters.reduce((acc, x) => x.isActive(state) ? acc + 1 : acc, 0)
+    });
+
+    this.filter = computed(() => {
+      const state = this.debouncedState();
+      return new FilterServiceState<TFilter, TModel>(state, this._filters);
+    });
   }
 
   protected addFullFilter(isActive: (filter: TFilter) => boolean, filter: <T extends TModel>(list: T[], filter: TFilter) => T[]) {
@@ -90,71 +94,51 @@ export abstract class FilterService<TFilter, TModel> implements IFilterService<T
     this._filters.push(new IndividualDataFilter<TFilter, TModel>(filter, isActive));
   }
 
-  protected update(change: (state: TFilter) => Partial<TFilter>) {
-    const result = change(this.state);
-    if (this.state === result) return;
-    this.delta = result;
-  }
-
   public clearFilter() {
-    this.state = deepCopy(this._resetState);
+    this.setState(deepCopy(this._resetState));
   }
 
-  dispose() {
-    this.clearFilter();
-    this._serializerSub?.unsubscribe();
-  }
-
-  private _serializerSub = new Subscription();
-
-  public withSerializer<TState extends FilterSaveState>(serialize: (filter: TFilter) => TState, deserialize: (state: MappedReadState<TState>) => Partial<TFilter>, subscribe = false) {
+  public async withSerializer<TState extends FilterSaveState>(
+    serialize: (filter: TFilter) => TState,
+    deserialize: (state: MappedReadState<TState>) => Partial<TFilter>,
+    injector?: Injector
+  ) {
     if (!this.saveAdapter) throw Error(`Can't use a filter serializer without an adapter`);
 
-    this.deserialize(deserialize as (state: FilterReadState) => Partial<TFilter>, subscribe).then(() => {
+    if (!injector) assertInInjectionContext(this.withSerializer);
+    injector ??= inject(Injector);
 
-      this._serializerSub.add(this._state$.pipe(
-        throttleTime(500, asyncScheduler, {leading: true, trailing: true}),
-        map(serialize),
-        catchError(err => {
-          console.log('Failed to serialize filter', this.constructor.name, err);
-          return EMPTY;
-        }),
-        distinctUntilChanged()
-      ).subscribe(state => this.saveAdapter?.writeState(state)));
+    await this.deserialize(deserialize as (state: FilterReadState) => Partial<TFilter>);
 
-    });
+    effect(() => {
+      try {
+        const state = this.debouncedState();
+        const data = serialize(state);
+        this.saveAdapter?.writeState(data);
+      } catch (err) {
+        console.log('Failed to serialize filter', this.constructor.name, err);
+      }
+    }, {injector});
   }
 
-  private async deserialize(deserialize: (state: FilterReadState) => Partial<TFilter>, subscribe: boolean) {
+  private async deserialize(deserialize: (state: FilterReadState) => Partial<TFilter>) {
+    if (!this.saveAdapter) throw Error(`Can't use a filter serializer without an adapter`);
 
-    await this.saveAdapter!.readState().then(deserialize).then(
-      state => this.delta = state,
+    await this.saveAdapter.readState().then(deserialize).then(
+      state => this.updateState(state),
       err => console.log('Failed to deserialize filter', this.constructor.name, err)
     );
-
-    if (subscribe) {
-      this._serializerSub.add(
-        this.saveAdapter!.subscribe().pipe(
-          skip(1),
-          map(deserialize),
-          catchError(err => {
-            console.log('Failed to deserialize filter', this.constructor.name, err);
-            return EMPTY;
-          }),
-        ).subscribe(state => this.delta = state)
-      );
-    }
   }
 }
 
 export type ITreeFolderFilterService<TFolder> = IFilterService<BaseTreeFolder<TFolder>>;
 
-export class TreeFolderFilterService<TFilter, TFolder> extends FilterService<TFilter, BaseTreeFolder<TFolder>> {
+export class TreeFolderFilterService<TFilter extends Record<string, unknown>, TFolder> extends FilterService<TFilter, BaseTreeFolder<TFolder>> {
 
 }
 
 export type ITreeItemFilterService<TItem> = IFilterService<BaseTreeItem<TItem>>;
 
-export class TreeItemFilterService<TFilter, TItem> extends FilterService<TFilter, BaseTreeItem<TItem>> {
+export class TreeItemFilterService<TFilter extends Record<string, unknown>, TItem> extends FilterService<TFilter, BaseTreeItem<TItem>> {
 
 }

@@ -1,6 +1,11 @@
 import {Selection, WithId} from "@juulsgaard/ts-tools";
 import {IListDataSourceConfig, ListDataSourceConfig} from "./list-source/list-source-config";
 import {TreeDataOptionConfig} from "./tree-source/tree-source-config";
+import {Injector} from "@angular/core";
+
+export function listDataSource<TModel extends WithId>(options?: {injector?: Injector}): IListDataSourceConfig<TModel> {
+  return new ListDataSourceConfig<TModel>(options);
+}
 
 export module DataSource {
 

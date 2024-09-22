@@ -105,9 +105,9 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
     }
 
     // Folder Filter
-    this.folderFilter$ = this.options.folderFilterService?.filter$ ?? of(undefined);
+    this.folderFilter$ = this.options.folderFilterService?.filter ?? of(undefined);
 
-    const folderFilterActive$ = this.options.folderFilterService?.activeFilters$?.pipe(
+    const folderFilterActive$ = this.options.folderFilterService?.activeFilters?.pipe(
       map(x => x > 0),
       distinctUntilChanged()
     ) ?? of(false);
@@ -120,9 +120,9 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
 
 
     // Item Filter
-    this.itemFilter$ = this.options.itemFilterService?.filter$ ?? of(undefined);
+    this.itemFilter$ = this.options.itemFilterService?.filter ?? of(undefined);
 
-    const itemFilterActive$ = this.options.itemFilterService?.activeFilters$?.pipe(
+    const itemFilterActive$ = this.options.itemFilterService?.activeFilters?.pipe(
       map(x => x > 0),
       distinctUntilChanged()
     ) ?? of(false);
