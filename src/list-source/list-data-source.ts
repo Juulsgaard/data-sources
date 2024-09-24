@@ -15,8 +15,8 @@ import {Page, Sort} from "../lib/types";
 import {
   assertInInjectionContext, computed, DestroyRef, effect, inject, Injector, signal, Signal, untracked
 } from "@angular/core";
-import {takeUntilDestroyed, toObservable} from "@angular/core/rxjs-interop";
-import {searchSignal} from "../lib/signals";
+import {takeUntilDestroyed} from "@angular/core/rxjs-interop";
+import {searchSignal} from "@juulsgaard/signal-tools";
 
 interface Outputs<T> {
   simple: Signal<ListUniversalData<T>[]>;
@@ -190,7 +190,6 @@ export class ListDataSource<TModel extends WithId> {
   private readonly itemSources$ = new BehaviorSubject<Observable<TModel[]>|undefined>(undefined);
 
   public readonly items: Signal<TModel[]> = this._items.asReadonly();
-  public readonly items$: Observable<TModel[]> = toObservable(this._items);
 
   public readonly length = computed(() => this.items().length);
   public readonly filteredLength = computed(() => this.filteredItems().length);

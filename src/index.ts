@@ -10,9 +10,9 @@ export type {AnyTreeSelection} from "./tree-source/tree-selection";
 
 export {ListDataSource} from "./list-source/list-data-source";
 export type {GridData, ListData, ListSearchData, ListUniversalData, TableColumn, TableData, ListFlag} from "./list-source/list-data";
-export {ListRange, ListSelection} from "./list-source/list-selection";
-export type {AnyListSelection} from "./list-source/list-selection";
-export {ListState} from './list-source/list-state'
+export {ListRange, ListSelection} from "./list-source/list-range";
+export type {AnyListSelection} from "./list-source/list-range";
+export {ListSelection} from './list-source/list-selection'
 
 export {FilterService, TreeFolderFilterService, TreeItemFilterService} from "./filtering/filter-service";
 export type {FilterAdapter, FilterSaveState, FilterReadState} from "./filtering/filter-adapter";
