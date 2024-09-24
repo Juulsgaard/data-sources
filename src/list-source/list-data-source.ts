@@ -1,4 +1,4 @@
-import {BehaviorSubject, EMPTY, Observable, of} from "rxjs";
+import {BehaviorSubject, EMPTY, isObservable, Observable, of} from "rxjs";
 import {catchError, switchMap} from "rxjs/operators";
 import Fuse from "fuse.js";
 import {IFilterServiceState} from "../filtering/filter-service";
@@ -13,7 +13,7 @@ import {
 } from "@juulsgaard/ts-tools";
 import {Page, Sort} from "../lib/types";
 import {
-  assertInInjectionContext, computed, DestroyRef, effect, inject, Injector, signal, Signal, untracked
+  assertInInjectionContext, computed, DestroyRef, effect, inject, Injector, isSignal, signal, Signal, untracked
 } from "@angular/core";
 import {takeUntilDestroyed} from "@angular/core/rxjs-interop";
 import {searchSignal} from "@juulsgaard/signal-tools";
@@ -32,7 +32,7 @@ export class ListDataSource<TModel extends WithId> {
 
   public readonly sortOptions: SortOption[];
   private readonly sortLookup: Map<string, SortFn<TModel>>;
-  private readonly searchKeys: {weight?: number, key: string}[] = [];
+  private readonly searchKeys: { weight?: number, key: string }[] = [];
 
   public readonly paginated: boolean;
   public readonly indexSorted: boolean;
@@ -116,7 +116,7 @@ export class ListDataSource<TModel extends WithId> {
     this.filterState = this.options.filterService?.filter ?? signal(undefined)
     //</editor-fold>
 
-    //<editor-fold desc="Setup Pipeline">
+    //<editor-fold desc="Build Pipeline">
 
     // Filtering
     this.filteredItems = computed(() => this.filterItems(this.items()));
@@ -182,12 +182,19 @@ export class ListDataSource<TModel extends WithId> {
       switchMap(x => x ?? EMPTY),
       takeUntilDestroyed(this.onDestroy),
       catchError(() => of([] as TModel[]))
-    ).subscribe(val => this.setItems(val));
+    ).subscribe(val => this._items.set(val));
+
+    effect(() => {
+      const source = this.itemSources();
+      if (!source) return;
+      this._items.set(source());
+    }, {injector: this.injector, allowSignalWrites: true});
   }
 
   //<editor-fold desc="Item Population">
   private readonly _items = signal<TModel[]>([]);
-  private readonly itemSources$ = new BehaviorSubject<Observable<TModel[]>|undefined>(undefined);
+  private readonly itemSources = signal<Signal<TModel[]>|undefined>(undefined);
+  private readonly itemSources$ = new BehaviorSubject<Observable<TModel[]> | undefined>(undefined);
 
   public readonly items: Signal<TModel[]> = this._items.asReadonly();
 
@@ -206,21 +213,34 @@ export class ListDataSource<TModel extends WithId> {
   /** A list of models after filtering, sorting and pagination **/
   public readonly paginatedItems: Signal<TModel[]>;
 
-
   /**
    * Populate the data source
    * @param items
    */
-  setItems(items: TModel[]) {
-    this._items.set(items);
-  }
-
+  setItems(items: TModel[]): void;
+  /**
+   * Populate the data source via signal
+   * @param items
+   */
+  setItems(items: Signal<TModel[]>): void;
   /**
    * Populate the data source via observable
    * @param items$
    */
-  setItems$(items$: Observable<TModel[]>|undefined) {
-    this.itemSources$.next(items$);
+  setItems(items$: Observable<TModel[]>): void;
+  setItems(items: TModel[] | Signal<TModel[]> | Observable<TModel[]>): void {
+
+    if (isSignal(items)) {
+      this.itemSources.set(items);
+      return;
+    }
+
+    if (isObservable(items)) {
+      this.itemSources$.next(items);
+      return;
+    }
+
+    this._items.set(items);
   }
 
   /**
@@ -288,6 +308,7 @@ export class ListDataSource<TModel extends WithId> {
       return {model: item, actions, flags, cssClasses};
     });
   }
+
   //</editor-fold>
 
   //<editor-fold desc="Map to Table">
@@ -314,13 +335,17 @@ export class ListDataSource<TModel extends WithId> {
   //</editor-fold>
 
   //<editor-fold desc="Search">
-  readonly searchQuery = signal<string|undefined>(undefined);
+  readonly searchQuery = signal<string | undefined>(undefined);
   private readonly preSearchData: Signal<ListSearchData<TModel>[]>;
   private _searcher?: Fuse<ListSearchData<TModel>>;
   private readonly searcher: Signal<Fuse<ListSearchData<TModel>>>;
-  private searchResultLimit = 200;
+  private searchResultLimit = 100;
 
   readonly searching: Signal<boolean>;
+
+  public clearSearch() {
+    this.searchQuery.set(undefined);
+  }
 
   /**
    * Add a search map to model
@@ -360,10 +385,12 @@ export class ListDataSource<TModel extends WithId> {
     this._searcher = new Fuse<ListSearchData<TModel>>(list, {
       includeScore: true,
       shouldSort: true,
-      keys: this.searchKeys.map(({key, weight}) => ({
-        name: ['search', key],
-        weight: weight ?? 1
-      }))
+      keys: this.searchKeys.map(({key, weight}) => (
+        {
+          name: ['search', key],
+          weight: weight ?? 1
+        }
+      ))
     });
 
     return this._searcher;
@@ -375,8 +402,8 @@ export class ListDataSource<TModel extends WithId> {
    * @param limit
    * @private
    */
-  private search(query: string|undefined, limit?: number): TModel[] {
-    if (!query) return this.preSearchData().map(x => x.model);
+  private search(query: string | undefined, limit?: number): TModel[] {
+    if (!query) return [];
     const result = this.searcher().search(query ?? '', {limit: limit ?? this.searchResultLimit});
     return result.map(x => x.item.model);
   }
@@ -416,14 +443,16 @@ export class ListDataSource<TModel extends WithId> {
       if (!query) return [];
 
       const result = this.searcher().search(query ?? '', {limit});
-      return result.map(x => ({
-        id: x.item.model.id,
-        model: x.item.model,
-        name: getName(x.item.model),
-        icon: getIcon(x.item.model),
-        extra: getExtra(x.item.model),
-        score: x.score ?? 0,
-      } satisfies DetachedSearchData<TModel>));
+      return result.map(x => (
+        {
+          id: x.item.model.id,
+          model: x.item.model,
+          name: getName(x.item.model),
+          icon: getIcon(x.item.model),
+          extra: getExtra(x.item.model),
+          score: x.score ?? 0,
+        } satisfies DetachedSearchData<TModel>
+      ));
     });
   }
 
@@ -442,7 +471,9 @@ export class ListDataSource<TModel extends WithId> {
    */
   private indexSort(list: TModel[]) {
     if (!this.options.indexSorted) return list;
-    return ([...list] as (TModel & ISorted)[]).sort(sortByIndexAsc);
+    return (
+      [...list] as (TModel & ISorted)[]
+    ).sort(sortByIndexAsc);
   }
 
   /**
@@ -452,6 +483,7 @@ export class ListDataSource<TModel extends WithId> {
    * @private
    */
   private sortItems(list: TModel[]): TModel[] {
+    if (!list.length) return list;
 
     const sort = this.sorting();
     if (!sort.active?.length || !sort.direction.length) return this.indexSort(list);
@@ -488,7 +520,12 @@ export class ListDataSource<TModel extends WithId> {
         id: item.model.id,
         firstLine: this.listConfig!.firstLine(item.model),
         secondLine: this.listConfig!.secondLine?.(item.model),
-        avatar: this.getImageUrl(item.model, !icon ? this.listConfig!.avatarPlaceholder : undefined, this.listConfig!.avatar, this.listConfig!.avatarCacheBuster),
+        avatar: this.getImageUrl(
+          item.model,
+          !icon ? this.listConfig!.avatarPlaceholder : undefined,
+          this.listConfig!.avatar,
+          this.listConfig!.avatarCacheBuster
+        ),
         icon: icon
       }
     });
@@ -509,9 +546,16 @@ export class ListDataSource<TModel extends WithId> {
         id: item.model.id,
         title: this.gridConfig!.title(item.model),
         subTitle: this.gridConfig!.subTitle?.(item.model),
-        image: this.getImageUrl(item.model, !icon ? this.gridConfig!.imagePlaceholder : undefined, this.gridConfig!.image, this.gridConfig!.imageCacheBuster),
+        image: this.getImageUrl(
+          item.model,
+          !icon ? this.gridConfig!.imagePlaceholder : undefined,
+          this.gridConfig!.image,
+          this.gridConfig!.imageCacheBuster
+        ),
         icon: icon,
-        index: (item.model as Partial<ISorted>).index
+        index: (
+          item.model as Partial<ISorted>
+        ).index
       }
     });
   }
@@ -526,14 +570,21 @@ export class ListDataSource<TModel extends WithId> {
    * @param getUrl
    * @param getCacheBuster
    */
-  private getImageUrl(data: TModel, fallback?: string, getUrl?: (model: TModel) => string | undefined, getCacheBuster?: (model: TModel) => string | Date | undefined): string | undefined {
+  private getImageUrl(
+    data: TModel,
+    fallback?: string,
+    getUrl?: (model: TModel) => string | undefined,
+    getCacheBuster?: (model: TModel) => string | Date | undefined
+  ): string | undefined {
     if (!getUrl) return undefined;
     const url = getUrl(data);
     if (!url) return fallback;
     if (!getCacheBuster) return url;
     const cacheBuster = getCacheBuster(data);
     if (!cacheBuster) return url;
-    const cbStr = cacheBuster instanceof Date ? (cacheBuster.getTime() / 1000).toFixed(0) : cacheBuster;
+    const cbStr = cacheBuster instanceof Date ? (
+      cacheBuster.getTime() / 1000
+    ).toFixed(0) : cacheBuster;
     return applyQueryParam(url, '_cb', cbStr);
   }
 
@@ -542,7 +593,7 @@ export class ListDataSource<TModel extends WithId> {
    * @param data - The row data
    * @param config - The action config
    */
-  private mapAction(data: TModel, config: ListActionConfig<TModel>): ListAction<TModel>|undefined {
+  private mapAction(data: TModel, config: ListActionConfig<TModel>): ListAction<TModel> | undefined {
     if (!config.action && !config.route) return undefined;
     if (config.filter && !config.filter(data)) return undefined;
 
@@ -550,8 +601,15 @@ export class ListDataSource<TModel extends WithId> {
       return config as ListAction<TModel>;
     }
 
-    return {name: config.name, icon: config.icon, color: config.color, newTab: !!config.newTab, route: config.route(data)};
+    return {
+      name: config.name,
+      icon: config.icon,
+      color: config.color,
+      newTab: !!config.newTab,
+      route: config.route(data)
+    };
   }
+
   //</editor-fold>
 
   //<editor-fold desc="Pagination">
@@ -571,7 +629,12 @@ export class ListDataSource<TModel extends WithId> {
 
     if (length > page.page * page.pageSize) return;
 
-    this._page.set({pageSize: page.pageSize, page: Math.floor((length - 1) / page.pageSize)});
+    this._page.set({
+      pageSize: page.pageSize,
+      page: Math.floor((
+        length - 1
+      ) / page.pageSize)
+    });
   }
 
   /**
@@ -584,7 +647,12 @@ export class ListDataSource<TModel extends WithId> {
     if (!this.options.paginated) return list;
 
     const pagination = this.page();
-    return list.slice(pagination.page * pagination.pageSize, (pagination.page + 1) * pagination.pageSize);
+    return list.slice(
+      pagination.page * pagination.pageSize,
+      (
+        pagination.page + 1
+      ) * pagination.pageSize
+    );
   }
 
   /**
@@ -598,7 +666,7 @@ export class ListDataSource<TModel extends WithId> {
    * @param pageIndex
    */
   public setPage({pageSize, pageIndex}: Page): void;
-  public setPage(page: Page|number) {
+  public setPage(page: Page | number) {
 
     const pagination = isNumber(page)
       ? {pageSize: untracked(this.page).pageSize, page}

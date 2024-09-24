@@ -1,7 +1,7 @@
 import {
   TreeDataSourceOptions, TreeFolderActionOptions, TreeFolderMap, TreeFolderNavigationOptions,
   TreeHiddenSearchColumnConfig, TreeHiddenSortColumnConfig, TreeItemActionOptions, TreeItemMap,
-  TreeItemNavigationOptions, TreeMoveActions, TreeRowConfig, TreeSearchColumnConfig, TreeSortConfig
+  TreeItemNavigationOptions, TreeRowConfig, TreeSearchColumnConfig, TreeSortConfig
 } from "./tree-data";
 import {
   RenderDataTypes, RenderDataValueType, RenderValueDataType, SortingTypes, SortingValueType
@@ -26,8 +26,7 @@ export class TreeDataOptionConfig<TFolder extends WithId, TItem extends WithId> 
       folderActions: [],
       itemActions: [],
       folderFlags: [],
-      itemFlags: [],
-      moveActions: {}
+      itemFlags: []
     };
   }
 
@@ -184,15 +183,6 @@ export class TreeDataOptionConfig<TFolder extends WithId, TItem extends WithId> 
    */
   addItemFlag(name: string, icon: string, filter: TreeItemMap<TFolder, TItem, boolean>, inactiveIcon?: string) {
     this.options.itemFlags.push({name, icon, filter, inactiveIcon});
-    return this;
-  }
-
-  /**
-   * Define actions for moving and relocating items
-   * @param actions
-   */
-  addMoveActions(actions: TreeMoveActions) {
-    this.options.moveActions = actions;
     return this;
   }
 

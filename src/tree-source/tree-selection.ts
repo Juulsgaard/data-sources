@@ -1,232 +1,248 @@
-import {isString, WithId} from "@juulsgaard/ts-tools";
-import {BehaviorSubject, Observable, Observer, of, shareReplay, Subscribable, Unsubscribable} from "rxjs";
+import {BaseTreeFolder, BaseTreeItem, TreeFolder, TreeItem} from "./tree-data";
 import {TreeDataSource} from "./tree-data-source";
-import {distinctUntilChanged, map, switchMap} from "rxjs/operators";
-import {cache, ObservableSet} from "@juulsgaard/rxjs-tools";
-import {BaseTreeItem, TreeFolder} from "./tree-data";
+import {isString, WithId} from "@juulsgaard/ts-tools";
+import {computed, signal, Signal} from "@angular/core";
 
-export class TreeSelection<TFolder extends WithId, TItem extends WithId> implements Subscribable<TItem | undefined> {
+interface ITreeSelection<TFolder extends WithId, TItem extends WithId> {
+  readonly multiple: false;
 
-  multiple: false = false;
+  readonly folderId: Signal<string | undefined>;
+  readonly folder: Signal<TFolder | undefined>;
+  readonly baseFolder: Signal<BaseTreeFolder<TFolder> | undefined>;
+  readonly metaFolder: Signal<TreeFolder<TFolder, TItem> | undefined>;
 
-  private _itemId$ = new BehaviorSubject<string | undefined>(undefined);
-  public itemId$: Observable<string | undefined>;
-  itemIdLookup$: Observable<Set<string>>;
+  readonly itemId: Signal<string | undefined>;
+  readonly item: Signal<TItem | undefined>;
+  readonly baseItem: Signal<BaseTreeItem<TItem> | undefined>;
+  readonly metaItem: Signal<TreeItem<TFolder, TItem> | undefined>;
 
-  item$: Observable<TItem | undefined>;
-  empty$: Observable<boolean>;
+  readonly empty: Signal<boolean>;
+}
 
-  constructor(private dataSource: TreeDataSource<TFolder, TItem>) {
+export class TreeSelection<TFolder extends WithId, TItem extends WithId> implements ITreeSelection<TFolder, TItem> {
 
-    this.itemId$ = this._itemId$.pipe(distinctUntilChanged());
-    this.itemIdLookup$ = this.itemId$.pipe(map(x => new Set<string>(x ? [x] : [])));
+  readonly multiple: false = false;
 
-    const baseItem$ = this.itemId$.pipe(
-      switchMap(id => !id ? of(undefined) : this.dataSource.baseItemLookup$.pipe(
-        map(lookup => lookup.get(id))
-      )),
-      cache()
-    );
+  private readonly _folderId = signal<string | undefined>(undefined);
+  readonly folderId = this._folderId.asReadonly();
+  readonly folder: Signal<TFolder | undefined>;
+  readonly baseFolder: Signal<BaseTreeFolder<TFolder> | undefined>;
+  readonly metaFolder: Signal<TreeFolder<TFolder, TItem> | undefined>;
 
-    this.item$ = baseItem$.pipe(
-      map(x => x?.model)
-    );
+  private readonly _itemId = signal<string | undefined>(undefined);
+  readonly itemId = this._itemId.asReadonly();
+  readonly item: Signal<TItem | undefined>;
+  readonly baseItem: Signal<BaseTreeItem<TItem> | undefined>;
+  readonly metaItem: Signal<TreeItem<TFolder, TItem> | undefined>;
 
-    this.empty$ = baseItem$.pipe(
-      map(x => !x)
-    );
+  readonly empty = computed(() => !this.item());
+
+  constructor(private readonly datasource: TreeDataSource<TFolder, TItem>) {
+
+    this.baseFolder = computed(() => {
+      const id = this.folderId();
+      if (!id) return undefined;
+      return datasource.baseFolderLookup().get(id);
+    });
+
+    this.folder = computed(() => this.baseFolder()?.model);
+
+    this.metaFolder = computed(() => {
+      const id = this.folderId();
+      if (!id) return undefined;
+      return datasource.metaFolderLookup().get(id);
+    });
+
+    this.baseItem = computed(() => {
+      const id = this.itemId();
+      if (!id) return undefined;
+
+      const item = datasource.baseItemLookup().get(id);
+      if (!item) return undefined;
+
+      const folder = this.baseFolder();
+      if (!folder) return undefined;
+
+      if (item.folderId !== folder.model.id) return undefined;
+      return item;
+    });
+
+    this.item = computed(() => this.baseItem()?.model);
+
+    this.metaItem = computed(() => {
+      const id = this.itemId();
+      if (!id) return undefined;
+
+      const folder = this.baseFolder();
+      if (!folder) return undefined;
+
+      const item = datasource.metaItemLookup().get(id);
+      if (!item) return undefined;
+
+      if (item.folderId !== folder.model.id) return undefined;
+      return item;
+    });
   }
 
-  subscribe(observer: Partial<Observer<TItem | undefined>>): Unsubscribable {
-    return this.item$.subscribe(observer);
+  setFolder(value: string | WithId | BaseTreeFolder<TFolder> | TreeFolder<TFolder, TItem> | undefined) {
+    const folderId = value == undefined ? undefined :
+      isString(value) ? value :
+        'id' in value ? value.id :
+          value.model.id;
+
+    this._folderId.set(folderId);
+    this._itemId.set(undefined);
+  }
+
+  setItem(value: string | WithId | BaseTreeItem<TItem> | TreeItem<TFolder, TItem> | undefined) {
+    const itemId = value == undefined ? undefined :
+      isString(value) ? value :
+        'id' in value ? value.id :
+          value.model.id;
+
+    let folderId = value == undefined ? undefined :
+      isString(value) ? undefined :
+        'id' in value ? undefined :
+          value.folderId;
+
+    if (!folderId && itemId) {
+      folderId = this.datasource.baseItemLookup().get(itemId)?.folderId;
+    }
+
+    this._folderId.set(folderId);
+    this._itemId.set(itemId);
+  }
+
+  clearFolder() {
+    this._folderId.set(undefined);
+    this._itemId.set(undefined);
+  }
+
+  clearItem() {
+    this._itemId.set(undefined);
   }
 
   /**
-   * Toggle the item in the selection
-   * @param item - The item to toggle
-   * @param state - A forced state (`true` = always add, `false` = always delete)
-   * @returns The applied change (`true` = item added, `false` = item removed, `undefined` = nothing changed)
+   * Create a signal emitting true when the given folder is selected
+   * @param folder
    */
-  toggleItem(item: string | WithId, state?: boolean): boolean|undefined {
-    const id = isString(item) ? item : item?.id;
+  folderIsActive(folder: string | WithId | BaseTreeFolder<TFolder> | TreeFolder<TFolder, TItem>): Signal<boolean> {
+    const folderId = folder == undefined ? undefined :
+      isString(folder) ? folder :
+        'id' in folder ? folder.id :
+          folder.model.id;
 
-    if (this._itemId$.value === id) {
-      if (state === true) return undefined;
-      this._itemId$.next(undefined);
-      return false;
-    }
-
-    if (state === false) return undefined;
-    this._itemId$.next(id);
-    return true;
-  }
-
-  setItem(item: string | WithId | undefined) {
-    const id = isString(item) ? item : item?.id;
-    this._itemId$.next(id);
-  }
-
-  isActive$(folder: WithId | string) {
-    const id = isString(folder) ? folder : folder.id;
-    return this.itemId$.pipe(
-      map(activeId => activeId ? activeId === id : false)
-    );
-  }
-}
-
-export class TreeRange<TFolder extends WithId, TItem extends WithId> implements Subscribable<TItem[]> {
-
-  multiple: true = true;
-
-  private _itemIds$ = new ObservableSet<string>();
-
-  itemIds$ = this._itemIds$.value$;
-  get itemIds() {return this._itemIds$.value}
-
-  itemIdArray$ = this._itemIds$.array$;
-  get itemIdArray() {return this._itemIds$.array};
-
-  items$: Observable<TItem[]>;
-  empty$: Observable<boolean>;
-
-  constructor(private dataSource: TreeDataSource<TFolder, TItem>) {
-
-    const baseItems$ = this.itemIdArray$.pipe(
-      switchMap(ids => !ids.length ? of([]) : this.dataSource.baseItemLookup$.pipe(
-        map(lookup => ids.map(x => lookup.get(x)).filter((x): x is BaseTreeItem<TItem> => !!x))
-      )),
-      cache()
-    );
-
-    this.items$ = baseItems$.pipe(
-      map(list => list.map(x => x.model))
-    );
-
-    this.empty$ = baseItems$.pipe(
-      map(x => !x.length)
-    );
-  }
-
-  subscribe(observer: Partial<Observer<TItem[]>>): Unsubscribable {
-    return this.items$.subscribe(observer);
+    return computed(() => this.folderId() === folderId);
   }
 
   /**
-   * Toggle an item in the selection
-   * @param item - The item to toggle
-   * @param state - A forced state (`true` = always add, `false` = always delete)
-   * @returns The applied change (`true` = item added, `false` = item removed, `undefined` = nothing changed)
+   * Create a signal emitting true when the given item is selected
+   * @param item
    */
-  toggleItem(item: string | WithId, state?: boolean): boolean|undefined {
-    const id = isString(item) ? item : item.id;
-    return this._itemIds$.toggle(id, state);
+  itemIsActive(item: string | WithId | BaseTreeItem<TItem> | TreeItem<TFolder, TItem>): Signal<boolean> {
+    const itemId = item == undefined ? undefined :
+      isString(item) ? item :
+        'id' in item ? item.id :
+          item.model.id;
+
+    return computed(() => this.item()?.id === itemId);
   }
 
-  setRange(list: string[] | WithId[]) {
-    this._itemIds$.set(list.map(x => isString(x) ? x : x.id));
+}
+
+export class TreeItemSelection<TFolder extends WithId, TItem extends WithId> implements ITreeSelection<TFolder, TItem>{
+
+  readonly multiple: false = false;
+
+  private readonly _itemId = signal<string | undefined>(undefined);
+  readonly itemId = this._itemId.asReadonly();
+  readonly item: Signal<TItem | undefined>;
+  readonly baseItem: Signal<BaseTreeItem<TItem> | undefined>;
+  readonly metaItem: Signal<TreeItem<TFolder, TItem> | undefined>;
+
+  readonly folderId = computed(() => this.baseItem()?.folderId);
+  readonly folder: Signal<TFolder | undefined>;
+  readonly baseFolder: Signal<BaseTreeFolder<TFolder> | undefined>;
+  readonly metaFolder: Signal<TreeFolder<TFolder, TItem> | undefined>;
+
+  readonly empty = computed(() => !this.item());
+
+  constructor(datasource: TreeDataSource<TFolder, TItem>) {
+
+    this.baseItem = computed(() => {
+      const id = this.itemId();
+      if (!id) return undefined;
+      return datasource.baseItemLookup().get(id);
+    });
+
+    this.item = computed(() => this.baseItem()?.model);
+
+    this.metaItem = computed(() => {
+      const id = this.itemId();
+      if (!id) return undefined;
+      return datasource.metaItemLookup().get(id);
+    });
+
+    this.baseFolder = computed(() => {
+      const id = this.folderId();
+      if (!id) return undefined;
+      return datasource.baseFolderLookup().get(id);
+    });
+
+    this.folder = computed(() => this.baseFolder()?.model);
+
+    this.metaFolder = computed(() => {
+      const id = this.folderId();
+      if (!id) return undefined;
+      return datasource.metaFolderLookup().get(id);
+    });
   }
 
-  clear() {
-    this._itemIds$.clear();
+  setItem(value: string | WithId | BaseTreeItem<TItem> | TreeItem<TFolder, TItem> | undefined) {
+    const itemId = value == undefined ? undefined :
+      isString(value) ? value :
+        'id' in value ? value.id :
+          value.model.id;
+
+    this._itemId.set(itemId);
   }
 
-  //<editor-fold desc="Toggle Entire Folder">
-  toggleFolder(folder: TreeFolder<TFolder, TItem>, checked: boolean) {
-    this._itemIds$.modify(set => this._toggleFolder(folder, checked, set));
+  clearItem() {
+    this._itemId.set(undefined);
   }
 
-  private _toggleFolder(folder: TreeFolder<TFolder, TItem>, checked: boolean, set: Set<string>) {
+  /**
+   * Create a signal emitting true when the given folder is selected
+   * @param folder
+   */
+  folderIsActive(folder: string | WithId | BaseTreeFolder<TFolder> | TreeFolder<TFolder, TItem>): Signal<boolean> {
+    const folderId = folder == undefined ? undefined :
+      isString(folder) ? folder :
+        'id' in folder ? folder.id :
+          folder.model.id;
 
-    for (let item of folder.items) {
-      if (checked) {
-        set.add(item.model.id);
-      } else {
-        set.delete(item.model.id);
-      }
-    }
-
-    for (let subFolder of folder.folders) {
-      this._toggleFolder(subFolder, checked, set);
-    }
+    return computed(() => this.folderId() === folderId);
   }
 
-  //</editor-fold>
+  /**
+   * Create a signal emitting true when the given item is selected
+   * @param item
+   */
+  itemIsActive(item: string | WithId | BaseTreeItem<TItem> | TreeItem<TFolder, TItem>): Signal<boolean> {
+    const itemId = item == undefined ? undefined :
+      isString(item) ? item :
+        'id' in item ? item.id :
+          item.model.id;
 
-  //<editor-fold desc="Folder Checkbox State">
-  getFolderState$(folder: TreeFolder<TFolder, TItem>): [checked: Observable<boolean>, indeterminate: Observable<boolean>] {
-    if (folder.itemCount < 1) return [of(false), of(false)];
-
-    const state$ = this.itemIds$.pipe(
-      map(lookup => {
-        if (!lookup.size) return 'none';
-        return this.getFolderState(lookup.size < folder.itemCount ? 'none' : undefined, folder, lookup);
-      }),
-      shareReplay({refCount: true, bufferSize: 1})
-    );
-
-    return [state$.pipe(map(x => x === 'all')), state$.pipe(map(x => x === 'some'))];
-  }
-
-  private getFolderState(
-    state: ActiveState | undefined,
-    folder: TreeFolder<TFolder, TItem>,
-    lookup: ReadonlySet<string>
-  ): ActiveState {
-
-    const itemState = this.getFolderItemState(folder, lookup);
-    if (itemState) {
-      if (itemState === 'some') return 'some';
-      if (!state) state = itemState;
-      if (itemState !== state) return 'some';
-    }
-
-    for (let subFolder of folder.folders) {
-      const subState = this.getFolderState(state, subFolder, lookup);
-      if (subState === 'some') return 'some';
-      if (!state) state = subState;
-      if (subState !== state) return 'some';
-    }
-
-    return state!;
-  }
-
-  private getFolderItemState(folder: TreeFolder<TFolder, TItem>, lookup: ReadonlySet<string>): ActiveState | undefined {
-    if (!folder.items.length) return undefined;
-    let itemState: ActiveState | undefined;
-
-    for (let item of folder.items) {
-      if (itemState === undefined) {
-        itemState = lookup.has(item.model.id) ? 'all' : 'none';
-        continue;
-      }
-
-      if (lookup.has(item.model.id)) {
-        if (itemState === 'none') return 'some';
-      } else {
-        if (itemState === 'all') return 'some';
-      }
-    }
-
-    return itemState!;
-  }
-
-  //</editor-fold>
-
-  isActive$(item: WithId | string) {
-    const id = isString(item) ? item : item.id;
-    return this.itemIds$.pipe(
-      map(lookup => lookup.has(id))
-    );
-  }
-
-  contains(item: WithId | string) {
-    const id = isString(item) ? item : item.id;
-    return this.itemIds.has(id);
+    return computed(() => this.itemId() === itemId);
   }
 }
+
+// export class TreeFolderSelection<TFolder extends WithId, TItem extends WithId> {
+//
+// }
 
 export type AnyTreeSelection<TFolder extends WithId, TItem extends WithId> =
   | TreeSelection<TFolder, TItem>
-  | TreeRange<TFolder, TItem>;
+  | TreeItemSelection<TFolder, TItem>;
 
-type ActiveState = 'none' | 'some' | 'all';

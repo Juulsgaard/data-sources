@@ -8,6 +8,8 @@ import {Subscribable} from "rxjs";
 
 export class ListRange<TModel extends WithId> {
 
+  readonly multiple: true = true;
+
   private readonly _itemIds = new SignalSet<string>();
 
   readonly itemIds = this._itemIds.value;

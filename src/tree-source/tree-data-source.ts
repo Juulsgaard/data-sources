@@ -1,7 +1,5 @@
-import {
-  asyncScheduler, auditTime, BehaviorSubject, combineLatest, merge, Observable, of, ReplaySubject, startWith
-} from "rxjs";
-import {catchError, distinctUntilChanged, map, switchMap, tap, throttleTime} from "rxjs/operators";
+import {BehaviorSubject, EMPTY, isObservable, Observable, of} from "rxjs";
+import {catchError, switchMap} from "rxjs/operators";
 import Fuse from "fuse.js";
 import {
   BaseTreeFolder, BaseTreeItem, TreeAsideData, TreeAsideFolderData, TreeAsideItemData, TreeDataSourceOptions, TreeFlag,
@@ -11,39 +9,54 @@ import {
   TreeSortConfig
 } from "./tree-data";
 import {ITreeFolderFilterState, ITreeItemFilterState} from "../filtering/filter-service";
-import {BulkRelocateModel, MoveModel} from "../models/move";
-import {cache, latestValueFromOrDefault, persistentCache} from "@juulsgaard/rxjs-tools";
 import {DetachedSearchData} from "../models/detached-search";
 import {
   applySelector, arrToLookup, arrToMap, mapArrNotNull, mapToArr, SimpleObject, SortFn, titleCase, WithId
 } from "@juulsgaard/ts-tools";
 import {Sort} from "../lib/types";
+import {
+  assertInInjectionContext, computed, DestroyRef, effect, EffectRef, inject, Injector, isSignal, signal, Signal,
+  untracked
+} from "@angular/core";
+import {ListDataSource} from "../list-source/list-data-source";
+import {takeUntilDestroyed} from "@angular/core/rxjs-interop";
+import {searchSignal} from "@juulsgaard/signal-tools";
 
 export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
 
   //<editor-fold desc="Outputs">
-  readonly treeData$: Observable<TreeFolderData<TFolder, TItem>[]>;
+  readonly treeData: Signal<TreeFolderData<TFolder, TItem>[]>;
 
-  readonly searchResult$: Observable<TreeSearchRowData<TFolder, TItem>[]>;
-  readonly folderSearchResult$: Observable<TreeFolderSearchRowData<TFolder, TItem>[]>;
-  readonly itemSearchResult$: Observable<TreeItemSearchRowData<TFolder, TItem>[]>;
+  readonly searchResult: Signal<TreeSearchRowData<TFolder, TItem>[]>;
+  readonly folderSearchResult: Signal<TreeFolderSearchRowData<TFolder, TItem>[]>;
+  readonly itemSearchResult: Signal<TreeItemSearchRowData<TFolder, TItem>[]>;
 
   //</editor-fold>
 
   //<editor-fold desc="Lookups">
-  readonly baseItems$: Observable<BaseTreeItem<TItem>[]>;
-  readonly metaItems$: Observable<TreeItem<TFolder, TItem>[]>;
+  readonly baseFolders: Signal<BaseTreeFolder<TFolder>[]>;
+  readonly metaFolders: Signal<TreeFolder<TFolder, TItem>[]>;
 
-  readonly itemLookup$: Observable<Map<string, TItem>>;
-  readonly baseItemLookup$: Observable<Map<string, BaseTreeItem<TItem>>>;
-  readonly metaItemLookup$: Observable<Map<string, TreeItem<TFolder, TItem>>>;
+  readonly folderLookup: Signal<Map<string, TFolder>>;
+  readonly baseFolderLookup: Signal<Map<string, BaseTreeFolder<TFolder>>>;
+  readonly metaFolderLookup: Signal<Map<string, TreeFolder<TFolder, TItem>>>;
 
-  readonly baseFolders$: Observable<BaseTreeFolder<TFolder>[]>;
-  readonly metaFolders$: Observable<TreeFolder<TFolder, TItem>[]>;
+  readonly filteredFolders: Signal<BaseTreeFolder<TFolder>[]>;
+  readonly filteredMetaFolders: Signal<TreeFolder<TFolder, TItem>[]>;
+  readonly filteredMetaFolderLookup: Signal<Map<string, TreeFolder<TFolder, TItem>>>;
 
-  readonly folderLookup$: Observable<Map<string, TFolder>>;
-  readonly baseFolderLookup$: Observable<Map<string, BaseTreeFolder<TFolder>>>;
-  readonly metaFolderLookup$: Observable<Map<string, TreeFolder<TFolder, TItem>>>;
+
+  readonly baseItems: Signal<BaseTreeItem<TItem>[]>;
+  readonly metaItems: Signal<TreeItem<TFolder, TItem>[]>;
+
+  readonly itemLookup: Signal<Map<string, TItem>>;
+  readonly baseItemLookup: Signal<Map<string, BaseTreeItem<TItem>>>;
+  readonly metaItemLookup: Signal<Map<string, TreeItem<TFolder, TItem>>>;
+
+  readonly filteredItems: Signal<BaseTreeItem<TItem>[]>;
+  readonly filteredMetaItems: Signal<TreeItem<TFolder, TItem>[]>;
+  readonly filteredMetaItemLookup: Signal<Map<string, TreeItem<TFolder, TItem>>>;
+
   //</editor-fold>
 
   readonly columns: TreeSearchColumnConfig<TFolder, any, TItem, any>[];
@@ -53,17 +66,9 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
   private sortLookup = new Map<string, TreeSortConfig<TFolder, TItem, unknown>>();
   private searchConfigs = new Map<string, TreeSearchConfig<TFolder, TItem>>();
 
-  public hasActions: boolean;
+  readonly hasActions: boolean;
 
-  //<editor-fold desc="Move Actions">
-  canMoveFolder$: Observable<boolean>;
-  canMoveItem$: Observable<boolean>;
-
-  onFolderMove?: (data: MoveModel) => Promise<unknown>|void;
-  onItemMove?: (data: MoveModel) => Promise<unknown>|void;
-  onFolderRelocate?: (data: BulkRelocateModel) => Promise<unknown>|void;
-  onItemRelocate?: (data: BulkRelocateModel) => Promise<unknown>|void;
-  //</editor-fold>
+  private readonly onDestroy: DestroyRef;
 
   constructor(
     private readonly options: TreeDataSourceOptions<TFolder, TItem>,
@@ -71,17 +76,22 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
     private readonly hiddenSearchColumn: TreeHiddenSearchColumnConfig<TFolder, TItem>[],
     private readonly hiddenSortColumns: TreeHiddenSortColumnConfig<TFolder, TItem, any>[],
     private readonly treeConfig?: TreeRowConfig<TFolder, TItem>,
+    private readonly injector?: Injector
   ) {
 
     if (!options.itemParentId && !options.folderChildren) {
       throw Error('Tree Data Source need either itemParentId or folderChildren defined');
     }
 
+    if (!this.injector) assertInInjectionContext(ListDataSource);
+
+    this.onDestroy = this.injector?.get(DestroyRef) ?? inject(DestroyRef);
+
     //<editor-fold desc="Initialise">
 
     this.hasActions = !!options.folderActions.length || !!options.itemActions.length;
 
-    this.columns = [...this.searchColumns];
+    this.columns = [...searchColumns];
 
     for (let col of hiddenSortColumns) {
       this.sortOptions.push({id: col.id, name: col.title});
@@ -105,70 +115,46 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
     }
 
     // Folder Filter
-    this.folderFilter$ = this.options.folderFilterService?.filter ?? of(undefined);
+    this.folderFilterState = this.options.folderFilterService?.filter ?? signal(undefined);
 
-    const folderFilterActive$ = this.options.folderFilterService?.activeFilters?.pipe(
-      map(x => x > 0),
-      distinctUntilChanged()
-    ) ?? of(false);
+    const folderFilterActive = computed(() => {
+      const activeCount = this.options.folderFilterService?.activeFilters() ?? 0;
+      return activeCount > 0;
+    });
 
-    this.foldersFiltered$ = combineLatest([this.folderBlackList$, folderFilterActive$]).pipe(
-      map(([blacklist, filtered]) => !!blacklist.length || filtered),
-      distinctUntilChanged(),
-      cache()
-    );
+    this.folderFilterActive = computed(() => this.folderBlacklist().length > 0 || folderFilterActive());
 
 
     // Item Filter
-    this.itemFilter$ = this.options.itemFilterService?.filter ?? of(undefined);
+    this.itemFilterState = this.options.itemFilterService?.filter ?? signal(undefined);
 
-    const itemFilterActive$ = this.options.itemFilterService?.activeFilters?.pipe(
-      map(x => x > 0),
-      distinctUntilChanged()
-    ) ?? of(false);
+    const itemFilterActive = computed(() => {
+      const activeCount = this.options.itemFilterService?.activeFilters() ?? 0;
+      return activeCount > 0;
+    });
 
-    this.itemsFiltered$ = combineLatest([this.itemBlackList$, itemFilterActive$]).pipe(
-      map(([blacklist, filtered]) => !!blacklist.length || filtered),
-      distinctUntilChanged(),
-      cache()
-    );
+    this.itemFilterActive = computed(() => this.itemBlacklist().length > 0 || itemFilterActive());
 
-    // Move Actions
-    this.canMoveFolder$ = options.moveActions.moveFolder ? this.foldersFiltered$.pipe(map(x => !x)) : of(false);
-    this.canMoveItem$ = options.moveActions.moveItem ? this.itemsFiltered$.pipe(map(x => !x)) : of(false);
+    // </editor-fold>
 
-    this.onFolderRelocate = options.moveActions.relocateFolders;
-    this.onItemRelocate = options.moveActions.relocateItems;
-    this.onFolderMove = options.moveActions.moveFolder;
-    this.onItemMove = options.moveActions.moveItem;
-    //</editor-fold>
-
-    //<editor-fold desc="Setup Observables">
+    //<editor-fold desc="Build Pipeline">
 
     //<editor-fold desc="Base Lists">
-    // Folders
-    this.folders$ = merge(
-      this._folders$,
-      this._folderSources$.pipe(switchMap(x => x))
-    ).pipe(cache());
 
+    // Folders
     if (options.folderParentId) {
       const folderParentId = options.folderParentId;
 
-      this.baseFolders$ = this.folders$.pipe(
-        map((folders) => folders.map(folder => ({
-          model: folder,
-          parentId: applySelector(folder, folderParentId)
-        }))),
-        cache()
-      );
+      this.baseFolders = computed(() => this.folders().map(folder => ({
+        model: folder,
+        parentId: applySelector(folder, folderParentId)
+      })));
 
     } else {
 
-      this.baseFolders$ = this.folders$.pipe(
-        map((folders) => folders.map(folder => ({model: folder}))),
-        cache()
-      );
+      this.baseFolders = computed(() => this.folders().map(folder => ({
+        model: folder
+      })));
 
     }
 
@@ -176,321 +162,278 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
     if (options.folderChildren) {
       const folderChildren = options.folderChildren;
 
-      this.items$ = this.folders$.pipe(
-        map(list => list.flatMap(folder => applySelector(folder, folderChildren))),
-        cache()
-      );
+      this.items = computed(() => this.folders().flatMap(
+        folder => applySelector(folder, folderChildren)
+      ));
 
-      this.baseItems$ = this.folders$.pipe(
-        map(list => list.flatMap(
-          folder => applySelector(folder, folderChildren).map(item => ({
-            folderId: folder.id,
-            model: item
-          }))
-        )),
-        cache()
-      );
+      this.baseItems = computed(() => this.folders().flatMap(
+        folder => applySelector(folder, folderChildren)
+          .map(item => ({folderId: folder.id, model: item}))
+      ));
 
-    } else if(options.itemParentId) {
-
+    } else if (options.itemParentId) {
       const itemParentId = options.itemParentId;
 
-      this.items$ = merge(
-        this._items$,
-        this._itemSources$.pipe(switchMap(x => x))
-      ).pipe(cache());
-
-      this.baseItems$ = this.items$.pipe(
-        map(list => list.map(item => ({
-          folderId: applySelector(item, itemParentId),
-          model: item
-        }))),
-        cache()
-      );
+      this.items = this.itemsIn;
+      this.baseItems = computed(() => this.itemsIn().map(item => ({
+        folderId: applySelector(item, itemParentId),
+        model: item
+      })));
 
     } else {
       throw Error("Invalid state");
     }
     //</editor-fold>
 
-    // Nest data for lookups
-    const nestedData$ = combineLatest([this.baseFolders$, this.baseItems$]).pipe(
-      auditTime(0),
-      map(([folders, items]) => this.nestData(folders, items)),
-      cache()
-    );
-
-    this.metaFolders$ = nestedData$.pipe(
-      map(({folders}) => folders),
-      cache()
-    );
-
-    this.metaItems$ = nestedData$.pipe(
-      map(({items}) => items),
-      cache()
-    );
-
     //<editor-fold desc="Lookups">
-    this.folderLookup$ = this.folders$.pipe(
-      map(list => arrToMap(list, x => x.id, x => x)),
-      cache()
-    );
+    this.folderLookup = computed(() => arrToMap(this.folders(), x => x.id));
+    this.itemLookup = computed(() => arrToMap(this.items(), x => x.id));
 
-    this.baseFolderLookup$ = this.baseFolders$.pipe(
-      map(list => arrToMap(list, x => x.model.id, x => x)),
-      cache()
-    );
+    this.baseFolderLookup = computed(() => arrToMap(this.baseFolders(), x => x.model.id));
+    this.baseItemLookup = computed(() => arrToMap(this.baseItems(), x => x.model.id));
 
-    this.metaFolderLookup$ = this.metaFolders$.pipe(
-      map(list => arrToMap(list, x => x.model.id, x => x)),
-      cache()
-    );
+    // Nest data for lookups
+    const nestedLookupData = computed(() => this.nestData(this.baseFolders(), this.baseItems()));
 
-    this.itemLookup$ = this.items$.pipe(
-      map(list => arrToMap(list, x => x.id, x => x)),
-      cache()
-    );
+    this.metaFolders = computed(() => nestedLookupData().folders);
+    this.metaItems = computed(() => nestedLookupData().items);
 
-    this.baseItemLookup$ = this.baseItems$.pipe(
-      map(list => arrToMap(list, x => x.model.id, x => x)),
-      cache()
-    );
-
-    this.metaItemLookup$ = this.metaItems$.pipe(
-      map(list => arrToMap(list, x => x.model.id, x => x)),
-      cache()
-    );
+    this.metaFolderLookup = computed(() => arrToMap(this.metaFolders(), x => x.model.id));
+    this.metaItemLookup = computed(() => arrToMap(this.metaItems(), x => x.model.id));
     //</editor-fold>
-
-    // State
-    this.foldersEmpty$ = this.folders$.pipe(map(x => !x.length), startWith(true), distinctUntilChanged());
-    this.itemsEmpty$ = this.items$.pipe(map(x => !x.length), startWith(true), distinctUntilChanged());
 
 
     // Filtering
-
-    const filteredFolders$ = combineLatest([this.baseFolders$, this.folderFilter$, this.folderBlackList$]).pipe(
-      map(([x, filter, blacklist]) => this.filterFolders(x, filter, blacklist)),
-      cache()
-    );
-
-    const filteredItems$ = combineLatest([this.baseItems$, this.itemFilter$, this.itemBlackList$]).pipe(
-      map(([x, filter, blacklist]) => this.filterItems(x, filter, blacklist)),
-      cache()
-    );
+    this.filteredFolders = computed(() => this.filterFolders(this.baseFolders()));
+    this.filteredItems = computed(() => this.filterItems(this.baseItems()));
 
     // Apply Nesting
-    const filteredNestedData$ = combineLatest([filteredFolders$, filteredItems$]).pipe(
-      auditTime(0),
-      map(([folders, items]) => this.nestData(folders, items)),
-      cache()
-    );
+    const nestedData = computed(() => this.nestData(this.filteredFolders(), this.filteredItems()));
 
-    this.filteredFolderLookup$ = filteredNestedData$.pipe(
-      map(x => x.folders),
-      map(folders => arrToMap(folders, x => x.model.id, x => x)),
-      persistentCache(500)
-    );
+    this.filteredMetaFolders = computed(() => nestedData().folders);
+    this.filteredMetaFolderLookup = computed(() => arrToMap(this.filteredMetaFolders(), x => x.model.id));
 
+    this.filteredMetaItems = computed(() => nestedData().items);
+    this.filteredMetaItemLookup = computed(() => arrToMap(this.filteredMetaItems(), x => x.model.id));
 
     // Tree Output
-    this.treeData$ = filteredNestedData$.pipe(
-      map(({folders}) => this.mapToTree(folders)),
-      cache(),
-    );
+    this.treeData = computed(() => this.mapToTree(this.filteredMetaFolders()));
 
-    this.folderSearchData$ = filteredNestedData$.pipe(
-      map(x => x.folders),
-      map(x => this.mapFolderSearchData(x)),
-      tap(list => this.setupFolderSearch(list)),
-      cache()
-    );
+    //Search Query
+    const query = searchSignal(this.searchQuery, 1000, 300, {injector: this.injector});
+    this.searching = computed(() => !!query()?.length);
 
-    this.itemSearchData$ = filteredNestedData$.pipe(
-      map(x => x.items),
-      map(x => this.mapItemSearchData(x)),
-      tap(list => this.setupItemSearch(list)),
-      cache()
-    );
+    // Search Data
+    this.preSearchFolders = computed(() => this.mapFoldersForSearch(this.filteredMetaFolders()));
+    this.folderSearcher = computed(() => this.getFolderSearcher(this.preSearchFolders()));
 
-    // Search Query
-    const searchQuery$ = this.searchQuery$.pipe(
-      throttleTime(800, asyncScheduler, {leading: false, trailing: true}),
-      startWith(undefined),
-      distinctUntilChanged(),
-      cache()
-    );
-
-    this.searching$ = searchQuery$.pipe(
-      map(x => !!x?.length),
-      distinctUntilChanged(),
-      cache()
-    );
+    this.preSearchItems = computed(() => this.mapItemsForSearch(this.filteredMetaItems()));
+    this.itemSearcher = computed(() => this.getItemSearcher(this.preSearchItems()));
 
     // Searching
-    const folderSearchData = combineLatest([this.folderSearchData$, searchQuery$]).pipe(
-      map(([, q]) => this.searchFolders(q ?? '')),
-      cache()
-    );
-
-    const itemSearchData = combineLatest([this.itemSearchData$, searchQuery$]).pipe(
-      map(([, q]) => this.searchItems(q ?? '')),
-      cache()
-    );
+    const folderSearchData = computed(() => this.searchFolders(query()));
+    const itemSearchData = computed(() => this.searchItems(query()));
 
     // Merge Search
-    const mergedSearchData = combineLatest([folderSearchData, itemSearchData]).pipe(
-      auditTime(0),
-      map(([folders, items]) => [...folders, ...items]),
-      map(list => list.sort((a, b) => (a?.score ?? 0) - (b?.score ?? 0))),
-      map(list => list.map(x => x.item))
+    const mergedSearchData = computed(
+      () => [...folderSearchData(), ...itemSearchData()]
+        .sort((a, b) => (a?.score ?? 0) - (b?.score ?? 0))
+        .map(x => x.item)
     );
 
     // Sorting
-    this.searchResult$ = combineLatest([mergedSearchData, this.sorting$]).pipe(
-      map(([list, sort]) => this.sort(list, sort)),
-      map(list => this.mapSearchRows(list)),
-      cache()
+    this.searchResult = computed(
+      () => this.mapSearchRows(
+        this.sortRows(mergedSearchData())
+      )
     );
 
-    const cleanFolderSearchData = folderSearchData.pipe(map(list => list.map(x => x.item)));
-    this.folderSearchResult$ = combineLatest([cleanFolderSearchData, this.sorting$]).pipe(
-      map(([list, sort]) => this.sort(list, sort)),
-      map(list => this.mapSearchRows(list) as TreeFolderSearchRowData<TFolder, TItem>[]),
-      cache()
+    this.folderSearchResult = computed(
+      () => this.mapSearchRows(
+        this.sortRows(folderSearchData().map(x => x.item))
+      ) as TreeFolderSearchRowData<TFolder, TItem>[]
     );
 
-    const cleanItemSearchData = itemSearchData.pipe(map(list => list.map(x => x.item)));
-    this.itemSearchResult$ = combineLatest([cleanItemSearchData, this.sorting$]).pipe(
-      map(([list, sort]) => this.sort(list, sort)),
-      map(list => this.mapSearchRows(list) as TreeItemSearchRowData<TFolder, TItem>[]),
-      cache()
+    this.itemSearchResult = computed(
+      () => this.mapSearchRows(
+        this.sortRows(itemSearchData().map(x => x.item))
+      ) as TreeItemSearchRowData<TFolder, TItem>[]
     );
 
     //</editor-fold>
+
+    // Map observable folders to folder signal
+    this.folderSources$.pipe(
+      switchMap(x => x ?? EMPTY),
+      takeUntilDestroyed(this.onDestroy),
+      catchError(() => of([] as TFolder[]))
+    ).subscribe(val => this._folders.set(val));
+
+    effect(() => {
+      const source = this.folderSources();
+      if (!source) return;
+      this._folders.set(source());
+    }, {injector: this.injector, allowSignalWrites: true});
+
+    // Map observable items to item signal
+    this.itemSources$.pipe(
+      switchMap(x => x ?? EMPTY),
+      takeUntilDestroyed(this.onDestroy),
+      catchError(() => of([] as TItem[]))
+    ).subscribe(val => this._itemsIn.set(val));
+
+    effect(() => {
+      const source = this.itemSources();
+      if (!source) return;
+      this._itemsIn.set(source());
+    }, {injector: this.injector, allowSignalWrites: true});
   }
 
   //<editor-fold desc="Folder Population">
-  private readonly _folders$ = new ReplaySubject<TFolder[]>(1);
-  private readonly _folderSources$ = new ReplaySubject<Observable<TFolder[]>>(1);
-  private readonly _recalculateFolders$ = new BehaviorSubject<void>(undefined);
+  private readonly _folders = signal<TFolder[]>([]);
+  private readonly folderSources = signal<Signal<TFolder[]>|undefined>(undefined);
+  private readonly folderSources$ = new BehaviorSubject<Observable<TFolder[]>|undefined>(undefined);
 
-  get folders(): TFolder[] {return latestValueFromOrDefault(this.folders$, [])}
-  public readonly folders$: Observable<TFolder[]>;
+  public readonly folders: Signal<TFolder[]> = this._folders.asReadonly();
+  public readonly folderCount = computed(() => this.folders().length);
+  public readonly foldersEmpty = computed(() => this.folderCount() <= 0);
 
-  public get foldersEmpty() {return this.folders.length <= 0}
-  public readonly foldersEmpty$: Observable<boolean>;
+  private folderEffectRef?: EffectRef;
 
   /**
-   * Populate folder list
-   * This triggers all affected data sources to re-evaluate
-   * @param folders - A list of Folders
+   * Populate the folder list
+   * @param folders
    */
-  setFolders(folders: TFolder[]) {
-    this._folders$.next(folders);
-  }
-
+  setFolders(folders: TFolder[]): void;
   /**
-   * Populate the folder data via observable
+   * Populate the folder list via signal
+   * @param folders
+   */
+  setFolders(folders: Signal<TFolder[]>): void;
+  /**
+   * Populate the folder list via observable
    * @param folders$
    */
-  setFolders$(folders$: Observable<TFolder[]>) {
-    this._folderSources$.next(folders$.pipe(catchError(() => of([]))));
+  setFolders(folders$: Observable<TFolder[]>): void;
+  setFolders(folders: TFolder[] | Signal<TFolder[]> | Observable<TFolder[]>): void {
+
+    if (isSignal(folders)) {
+      this.folderSources.set(folders);
+      return;
+    }
+
+    if (isObservable(folders)) {
+      this.folderSources$.next(folders);
+      return;
+    }
+
+    this._folders.set(folders);
   }
 
   /**
    * Trigger a re-calculation of the folder data source pipeline
    */
   recalculateFolders() {
-    this._recalculateFolders$.next();
+    this._folders.set([...untracked(this.folders)]);
   }
 
   //</editor-fold>
 
   //<editor-fold desc="Item Population">
-  private readonly _items$ = new ReplaySubject<TItem[]>(1);
-  private readonly _itemSources$ = new ReplaySubject<Observable<TItem[]>>(1);
-  private readonly _recalculateItems$ = new BehaviorSubject<void>(undefined);
+  private readonly _itemsIn = signal<TItem[]>([]);
+  private readonly itemSources = signal<Signal<TItem[]>|undefined>(undefined);
+  private readonly itemSources$ = new BehaviorSubject<Observable<TItem[]>|undefined>(undefined);
 
-  get items(): TItem[] {return latestValueFromOrDefault(this.items$, [])}
-  public readonly items$: Observable<TItem[]>;
+  public readonly itemsIn: Signal<TItem[]> = this._itemsIn.asReadonly();
+  public readonly items: Signal<TItem[]>;
+  public readonly itemCount = computed(() => this.items().length);
+  public readonly itemsEmpty = computed(() => this.itemCount() <= 0);
 
-  public get itemsEmpty() {return this.items.length <= 0}
-  public readonly itemsEmpty$: Observable<boolean>;
+  private itemEffectRef?: EffectRef;
 
   /**
-   * Populate item list
-   * This triggers all affected data sources to re-evaluate
-   * @param items - A list of Items
+   * Populate the item list
+   * @param items
    */
-  setItems(items: TItem[]) {
-    this._items$.next(items);
-  }
-
+  setItems(items: TItem[]): void;
   /**
-   * Populate the item data via observable
+   * Populate the item list via signal
+   * @param items
+   */
+  setItems(items: Signal<TItem[]>): void;
+  /**
+   * Populate the item list via observable
    * @param items$
    */
-  setItems$(items$: Observable<TItem[]>) {
-    this._itemSources$.next(items$.pipe(catchError(() => of([]))));
+  setItems(items$: Observable<TItem[]>): void;
+  setItems(items: TItem[] | Signal<TItem[]> | Observable<TItem[]>): void {
+
+    if (isSignal(items)) {
+     this.itemSources.set(items);
+      return;
+    }
+
+    if (isObservable(items)) {
+      this.itemSources$.next(items);
+      return;
+    }
+
+    this._itemsIn.set(items);
   }
 
   /**
    * Trigger a re-calculation of the item data source pipeline
    */
   recalculateItems() {
-    this._recalculateItems$.next();
+    this._itemsIn.set([...untracked(this.itemsIn)]);
   }
 
   //</editor-fold>
 
   //<editor-fold desc="Filtering">
-  private folderFilter$: Observable<ITreeFolderFilterState<TFolder>|undefined>;
-  private itemFilter$: Observable<ITreeItemFilterState<TItem>|undefined>;
+  private readonly folderFilterState: Signal<ITreeFolderFilterState<TFolder> | undefined>;
+  private readonly itemFilterState: Signal<ITreeItemFilterState<TItem> | undefined>;
 
-  private itemBlackList$ = new BehaviorSubject<string[]>([]);
-  private folderBlackList$ = new BehaviorSubject<string[]>([]);
+  private folderBlacklist = signal<string[]>([]);
+  private itemBlacklist = signal<string[]>([]);
 
-  public foldersFiltered$: Observable<boolean>;
-  public itemsFiltered$: Observable<boolean>;
-
-  private filteredFolderLookup$: Observable<Map<string, TreeFolder<TFolder, TItem>>>;
+  public readonly folderFilterActive: Signal<boolean>;
+  public readonly itemFilterActive: Signal<boolean>;
 
   /**
    * Define a list of Item Ids that will be removed from the final result
    * @param ids
    */
-  set itemBlackList(ids: string[] | undefined) {
-    this.itemBlackList$.next(ids ?? []);
+  setItemBlackList(ids: string[] | undefined) {
+    this.itemBlacklist.set(ids ?? []);
   }
 
   /**
    * Define a list of Folder Ids that will be removed from the final result
    * @param ids
    */
-  set folderBlackList(ids: string[] | undefined) {
-    this.folderBlackList$.next(ids ?? []);
+  setFolderBlackList(ids: string[] | undefined) {
+    this.folderBlacklist.set(ids ?? []);
   }
 
   /**
    * Filters a list of DeepFolders
    * @param list - Folders
-   * @param filter - The filter state
-   * @param blacklist - Folders to exclude
    * @return folders - A filtered list of folders
    * @private
    */
   private filterFolders(
-    list: BaseTreeFolder<TFolder>[],
-    filter?: ITreeFolderFilterState<TFolder>,
-    blacklist?: string[]
+    list: BaseTreeFolder<TFolder>[]
   ): BaseTreeFolder<TFolder>[] {
+    if (list.length <= 0) return list;
 
+    const blacklist = this.folderBlacklist();
     if (blacklist?.length) {
       const set = new Set<string>(blacklist);
       list = list.filter(x => !set.has(x.model.id));
     }
 
+    const filter = this.folderFilterState();
     if (!filter) return list;
     return filter.filter(list);
   }
@@ -498,23 +441,21 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
   /**
    * Filters a list of Items
    * @param list - List of Items
-   * @param filter - The filter state
-   * @param blacklist - Items to exclude
    * @return items - Filtered list of Items
    * @private
    */
   private filterItems(
-    list: BaseTreeItem<TItem>[],
-    filter?: ITreeItemFilterState<TItem>,
-    blacklist?: string[]
-  ):  BaseTreeItem<TItem>[] {
-    if (!list) return [];
+    list: BaseTreeItem<TItem>[]
+  ): BaseTreeItem<TItem>[] {
+    if (list.length <= 0) return list;
 
+    const blacklist = this.itemBlacklist();
     if (blacklist?.length) {
       const set = new Set<string>(blacklist);
       list = list.filter(x => !set.has(x.model.id));
     }
 
+    const filter = this.itemFilterState();
     if (!filter) return list;
     return filter.filter(list);
   }
@@ -694,20 +635,14 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
 
   //<editor-fold desc="Sidebar Data">
 
-  public getSidebarData(folderId$: Observable<string|undefined>): Observable<TreeAsideData<TFolder, TItem>> {
-
-    return folderId$.pipe(
-      switchMap(folderId => this.filteredFolderLookup$.pipe(
-        map(lookup => this.mapSidebarData(folderId, lookup))
-      )),
-      cache()
-    );
+  public getSidebarData(folderId: Signal<string|undefined>): Signal<TreeAsideData<TFolder, TItem>> {
+    return computed(() => this.mapSidebarData(folderId()));
   }
 
-  private mapSidebarData(folderId: string|undefined, lookup: Map<string, TreeFolder<TFolder, TItem>>): TreeAsideData<TFolder, TItem> {
+  private mapSidebarData(folderId: string|undefined): TreeAsideData<TFolder, TItem> {
 
-    const folder = folderId ? lookup.get(folderId) : undefined;
-    if (!folder) return this.mapSidebarRoot(lookup);
+    const folder = folderId ? this.filteredMetaFolderLookup().get(folderId) : undefined;
+    if (!folder) return this.mapSidebarRoot();
 
     const folders = folder.folders.map(x => this.mapSidebarFolder(x));
     const items = folder.items.map(x => this.mapSidebarItem(x));
@@ -726,9 +661,9 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
     }
   }
 
-  private mapSidebarRoot(lookup: Map<string, TreeFolder<TFolder, TItem>>): TreeAsideData<TFolder, TItem> {
+  private mapSidebarRoot(): TreeAsideData<TFolder, TItem> {
 
-    const folders = mapToArr(lookup)
+    const folders = this.filteredMetaFolders()
       .filter(folder => folder.parentId == undefined)
       .map(folder => this.mapSidebarFolder(folder));
 
@@ -844,7 +779,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
    * @return searchFolders - searchable variants of the Folder
    * @private
    */
-  private mapFolderSearchData(folders: TreeFolder<TFolder, TItem>[]): TreeFolderSearchData<TFolder, TItem>[] {
+  private mapFoldersForSearch(folders: TreeFolder<TFolder, TItem>[]): TreeFolderSearchData<TFolder, TItem>[] {
 
     return folders.map(folder => {
       const search: Record<string, string> = {};
@@ -865,7 +800,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
    * @return searchItems - The mapped search variants of the Item
    * @private
    */
-  private mapItemSearchData(items: TreeItem<TFolder, TItem>[]): TreeItemSearchData<TFolder, TItem>[] {
+  private mapItemsForSearch(items: TreeItem<TFolder, TItem>[]): TreeItemSearchData<TFolder, TItem>[] {
 
     return items.map(item => {
       const search: Record<string, string> = {};
@@ -911,20 +846,22 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
   //</editor-fold>
 
   //<editor-fold desc="Search">
-  public searchQuery$ = new BehaviorSubject<string | undefined>(undefined);
+  readonly searchQuery = signal<string | undefined>(undefined);
 
-  private folderSearcher?: Fuse<TreeFolderSearchData<TFolder, TItem>>;
-  private itemSearcher?: Fuse<TreeItemSearchData<TFolder, TItem>>;
+  private readonly preSearchFolders: Signal<TreeFolderSearchData<TFolder, TItem>[]>;
+  private _folderSearcher?: Fuse<TreeFolderSearchData<TFolder, TItem>>;
+  private readonly folderSearcher: Signal<Fuse<TreeFolderSearchData<TFolder, TItem>>>;
+
+  private readonly preSearchItems: Signal<TreeItemSearchData<TFolder, TItem>[]>;
+  private _itemSearcher?: Fuse<TreeItemSearchData<TFolder, TItem>>;
+  private readonly itemSearcher: Signal<Fuse<TreeItemSearchData<TFolder, TItem>>>;
 
   private searchResultLimit = 100;
 
-  private folderSearchData$: Observable<TreeFolderSearchData<TFolder, TItem>[]>;
-  private itemSearchData$: Observable<TreeItemSearchData<TFolder, TItem>[]>;
-
-  searching$: Observable<boolean>;
+  searching: Signal<boolean>;
 
   public clearSearch() {
-    this.searchQuery$.next(undefined);
+    this.searchQuery.set(undefined);
   }
 
   /**
@@ -932,14 +869,14 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
    * @param folders - Folder search data
    * @private
    */
-  private setupFolderSearch(folders: TreeFolderSearchData<TFolder, TItem>[]) {
+  private getFolderSearcher(folders: TreeFolderSearchData<TFolder, TItem>[]) {
 
-    if (this.folderSearcher) {
-      this.folderSearcher.setCollection(folders);
-      return;
+    if (this._folderSearcher) {
+      this._folderSearcher.setCollection(folders);
+      return this._folderSearcher;
     }
 
-    this.folderSearcher = new Fuse<TreeFolderSearchData<TFolder, TItem>>(folders, {
+    this._folderSearcher = new Fuse<TreeFolderSearchData<TFolder, TItem>>(folders, {
       includeScore: true,
       shouldSort: true,
       keys: mapToArr(this.searchConfigs, (col, key) => ({key, col}))
@@ -949,6 +886,8 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
           weight: col.weight ?? 1
         }))
     });
+
+    return this._folderSearcher;
   }
 
   /**
@@ -956,20 +895,22 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
    * @param items - Item search data
    * @private
    */
-  private setupItemSearch(items: TreeItemSearchData<TFolder, TItem>[]) {
+  private getItemSearcher(items: TreeItemSearchData<TFolder, TItem>[]) {
 
-    if (this.itemSearcher) {
-      this.itemSearcher.setCollection(items);
-      return;
+    if (this._itemSearcher) {
+      this._itemSearcher.setCollection(items);
+      return this._itemSearcher;
     }
 
-    this.itemSearcher = new Fuse<TreeItemSearchData<TFolder, TItem>>(items, {
+    this._itemSearcher = new Fuse<TreeItemSearchData<TFolder, TItem>>(items, {
       includeScore: true,
       shouldSort: true,
       keys: mapToArr(this.searchConfigs, (val, key) => ({key, val}))
         .filter(({val}) => !!val.mapItem)
         .map(({key}) => ['search', key])
     });
+
+    return this._itemSearcher;
   }
 
   /**
@@ -979,8 +920,9 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
    * @return folders - Folders that match the search query
    * @private
    */
-  private searchFolders(query: string, limit?: number) {
-    return this.folderSearcher!.search(query, {limit: limit ?? this.searchResultLimit});
+  private searchFolders(query: string|undefined, limit?: number) {
+    if (!query) return [];
+    return this.folderSearcher()!.search(query, {limit: limit ?? this.searchResultLimit});
   }
 
   /**
@@ -990,8 +932,9 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
    * @return items - Items that match the search query
    * @private
    */
-  private searchItems(query: string, limit?: number) {
-    return this.itemSearcher!.search(query, {limit: limit ?? this.searchResultLimit});
+  private searchItems(query: string|undefined, limit?: number) {
+    if (!query) return [];
+    return this.itemSearcher().search(query, {limit: limit ?? this.searchResultLimit});
   }
 
   //</editor-fold>
@@ -1000,63 +943,71 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
 
   /**
    * Generate a detached search feed with a dedicated query for Folders
-   * @param query$ - The dedicated query
+   * @param searchQuery - The dedicated query (should be throttled if coming from user input)
    * @param limit - Limit the amount of search results
    */
-  getDetachedFolderSearch(query$: Observable<string>, limit = 20): Observable<DetachedSearchData<TreeFolder<TFolder, TItem>>[]> {
+  getDetachedFolderSearch(searchQuery: Signal<string>, limit = 20): Signal<DetachedSearchData<TreeFolder<TFolder, TItem>>[]> {
+    return computed(() => {
 
-    return combineLatest([this.folderSearchData$, query$]).pipe(
-      map(([, query]) => this.searchFolders(query ?? '', 20)),
-      map(list => list.map(({score, item}) => ({
-        id: item.model.model.id,
-        model: item.model,
-        name: this.treeConfig?.folderName(item.model.model, item.model),
-        icon: this.getFolderIcon(item.model),
-        extra: this.treeConfig?.folderBonus?.(item.model.model, item.model),
-        score: score
-      } as DetachedSearchData<TreeFolder<TFolder, TItem>>))),
-      cache()
-    );
+      const query = searchQuery();
+      if (!query) return [];
+
+      const result = this.folderSearcher().search(query ?? '', {limit});
+      return result.map(({item, score}) => (
+        {
+          id: item.model.model.id,
+          model: item.model,
+          name: this.treeConfig?.folderName(item.model.model, item.model) ?? 'N/A',
+          icon: this.getFolderIcon(item.model),
+          extra: this.treeConfig?.folderBonus?.(item.model.model, item.model),
+          score: score ?? 0
+        } satisfies DetachedSearchData<TreeFolder<TFolder, TItem>>
+      ));
+    });
   }
 
   /**
    * Generate a detached search feed with a dedicated query for Items
-   * @param query$ - The dedicated query
+   * @param searchQuery - The dedicated query (should be throttled if coming from user input)
    * @param limit - Limit the amount of search results
    */
-  getDetachedItemSearch(query$: Observable<string>, limit = 20): Observable<DetachedSearchData<TreeItem<TFolder, TItem>>[]> {
+  getDetachedItemSearch(searchQuery: Signal<string>, limit = 20): Signal<DetachedSearchData<TreeItem<TFolder, TItem>>[]> {
+    return computed(() => {
 
-    return combineLatest([this.itemSearchData$, query$]).pipe(
-      map(([, query]) => this.searchItems(query ?? '', 20)),
-      map(list => list.map(({score, item}) => ({
-        id: item.model.model.id,
-        model: item.model,
-        name: this.treeConfig?.itemName(item.model.model, item.model),
-        icon: this.getItemIcon(item.model),
-        extra: this.treeConfig?.itemBonus?.(item.model.model, item.model),
-        score: score
-      } as DetachedSearchData<TreeItem<TFolder, TItem>>))),
-      cache()
-    );
+      const query = searchQuery();
+      if (!query) return [];
+
+      const result = this.itemSearcher().search(query ?? '', {limit});
+      return result.map(({item, score}) => (
+        {
+          id: item.model.model.id,
+          model: item.model,
+          name: this.treeConfig?.itemName(item.model.model, item.model) ?? 'N/A',
+          icon: this.getItemIcon(item.model),
+          extra: this.treeConfig?.itemBonus?.(item.model.model, item.model),
+          score: score ?? 0
+        } satisfies DetachedSearchData<TreeItem<TFolder, TItem>>
+      ));
+    });
   }
 
   //</editor-fold>
 
   //<editor-fold desc="Sorting">
-  private sorting$ = new BehaviorSubject<Sort>({active: '', direction: 'asc'});
-
-  get sorting() {
-    return this.sorting$.value
-  }
+  private static readonly defaultSorting: Sort = {active: '', direction: 'asc'};
+  private readonly _sorting = signal(TreeDataSource.defaultSorting);
+  private readonly sorting = this._sorting.asReadonly();
 
   /**
    * Sort search results
    * @param list - Merged tree search results
-   * @param sort - Sort options
    * @return sortedList - Sorted search results
    * @private
    */
-  private sort(list: TreeSearchData<TFolder, TItem>[], sort: Sort): TreeSearchData<TFolder, TItem>[] {
+  private sortRows(list: TreeSearchData<TFolder, TItem>[]): TreeSearchData<TFolder, TItem>[] {
+    if (!list.length) return list;
+
+    const sort = this.sorting();
     if (!sort.active?.length) return list;
     if (!sort.direction.length) return list;
 
@@ -1082,7 +1033,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
    * @param sort
    */
   setSort(sort: Sort) {
-    this.sorting$.next(sort);
+    this._sorting.set(sort);
   }
 
   //</editor-fold>

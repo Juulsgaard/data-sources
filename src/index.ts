@@ -3,10 +3,10 @@ export type {
   TreeSearchColumnConfig, TreeItemMeta, TreeFolderMeta
 } from "./tree-source/tree-data";
 export {TreeDataSource} from "./tree-source/tree-data-source";
-export {TreeState, TreeItemState} from "./tree-source/tree-state";
-export type {AnyTreeState} from "./tree-source/tree-state";
-export {TreeRange, TreeSelection} from "./tree-source/tree-selection";
-export type {AnyTreeSelection} from "./tree-source/tree-selection";
+export {TreeState, TreeItemState} from "./tree-source/tree-selection";
+export type {AnyTreeState} from "./tree-source/tree-selection";
+export {TreeRange, TreeSelection} from "./tree-source/tree-range";
+export type {AnyTreeSelection} from "./tree-source/tree-range";
 
 export {ListDataSource} from "./list-source/list-data-source";
 export type {GridData, ListData, ListSearchData, ListUniversalData, TableColumn, TableData, ListFlag} from "./list-source/list-data";

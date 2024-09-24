@@ -1,6 +1,5 @@
 import {ITreeFolderFilterService, ITreeItemFilterService} from "../filtering/filter-service";
 import {RenderValueDataType} from "../models/render-types";
-import {BulkRelocateModel, MoveModel} from "../models/move";
 import {Selection, SortFn} from "@juulsgaard/ts-tools";
 import {ThemeColor} from "../lib/types";
 
@@ -158,15 +157,6 @@ export interface TreeDataSourceOptions<TFolder, TItem> {
 
   folderFlags: TreeFolderFlagConfig<TFolder, TItem>[];
   itemFlags: TreeItemFlagConfig<TFolder, TItem>[];
-
-  moveActions: TreeMoveActions;
-}
-
-export interface TreeMoveActions {
-  moveFolder?: (data: MoveModel) => Promise<unknown>|void;
-  moveItem?: (data: MoveModel) => Promise<unknown>|void;
-  relocateFolders?: (data: BulkRelocateModel) => Promise<unknown>|void;
-  relocateItems?: (data: BulkRelocateModel) => Promise<unknown>|void;
 }
 
 /**

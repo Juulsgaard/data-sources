@@ -7,6 +7,8 @@ import {
 
 export class ListSelection<TModel extends WithId> {
 
+  readonly multiple: false = false;
+
   private readonly _itemId = signal<string | undefined>(undefined);
   readonly itemId = this._itemId.asReadonly();
 
