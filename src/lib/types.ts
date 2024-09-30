@@ -14,3 +14,5 @@ export interface Page {
   /** The current page size */
   pageSize: number;
 }
+
+export type RangeSelectionState = 'none' | 'some' | 'all';

@@ -5,8 +5,10 @@ import {
   assertInInjectionContext, computed, DestroyRef, effect, inject, Injector, isSignal, Signal
 } from "@angular/core";
 import {Subscribable} from "rxjs";
+import {IListState} from "./list-state-common";
+import {RangeSelectionState} from "../lib/types";
 
-export class ListRange<TModel extends WithId> {
+export class ListRange<TModel extends WithId> implements IListState {
 
   readonly multiple: true = true;
 
@@ -19,7 +21,7 @@ export class ListRange<TModel extends WithId> {
   readonly size: Signal<number>;
   readonly empty: Signal<boolean>;
 
-  readonly selectionState: Signal<ActiveState>;
+  readonly selectionState: Signal<RangeSelectionState>;
   readonly someSelected: Signal<boolean>;
   readonly allSelected: Signal<boolean>;
 
@@ -56,7 +58,7 @@ export class ListRange<TModel extends WithId> {
   }
 
   /**
-   * Toggle an item in the selection
+   * Toggle an item in the range
    * @param item - The item to toggle
    * @param state - A forced state (`true` = always add, `false` = always delete)
    * @returns The applied change (`true` = item added, `false` = item removed, `undefined` = nothing changed)
@@ -75,8 +77,6 @@ export class ListRange<TModel extends WithId> {
     return this._itemIds.has(id);
   }
 }
-
-type ActiveState = 'none' | 'some' | 'all';
 
 /**
  * Create a range for the Datasource

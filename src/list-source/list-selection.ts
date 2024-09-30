@@ -4,8 +4,9 @@ import {ListDataSource} from "./list-data-source";
 import {
   assertInInjectionContext, computed, DestroyRef, effect, inject, Injector, isSignal, Signal, signal, untracked
 } from "@angular/core";
+import {IListState} from "./list-state-common";
 
-export class ListSelection<TModel extends WithId> {
+export class ListSelection<TModel extends WithId> implements IListState {
 
   readonly multiple: false = false;
 
