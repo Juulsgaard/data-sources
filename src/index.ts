@@ -3,7 +3,6 @@ export {FilterService, TreeFolderFilterService, TreeItemFilterService} from "./f
 export type {FilterAdapter, FilterSaveState, FilterReadState} from "./filtering/filter-adapter";
 export {CreateAction} from "./models/create-action";
 export {RenderDataTypes, SortingTypes} from "./models/render-types";
-export {DataSource, Data} from "./constructor";
 
 export type {RangeSelectionState} from './lib/types';
 

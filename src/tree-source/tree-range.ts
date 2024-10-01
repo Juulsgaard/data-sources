@@ -2,7 +2,7 @@ import {isString, WithId} from "@juulsgaard/ts-tools";
 import {TreeDataSource} from "./tree-data-source";
 import {BaseTreeFolder, BaseTreeItem, TreeFolder, TreeItem} from "./tree-data";
 import {
-  assertInInjectionContext, computed, DestroyRef, effect, inject, Injector, isSignal, signal, Signal, untracked
+  assertInInjectionContext, computed, DestroyRef, effect, inject, Injector, isSignal, Signal, untracked
 } from "@angular/core";
 import {SignalSet} from "@juulsgaard/signal-tools";
 import {ITreeState} from "./tree-state-common";
@@ -48,7 +48,11 @@ export class TreeItemRange<TFolder extends WithId, TItem extends WithId> impleme
    * @param shallow - Only add direct children
    * @returns The applied change (`true` = folder items added, `false` = folder items removed, `undefined` = nothing changed)
    */
-  toggleFolder(folder: string | WithId | BaseTreeFolder<TFolder> | TreeFolder<TFolder, TItem>, state?: boolean, shallow = false): boolean|undefined {
+  toggleFolder(
+    folder: string | WithId | BaseTreeFolder<TFolder> | TreeFolder<TFolder, TItem>,
+    state?: boolean,
+    shallow = false
+  ): boolean | undefined {
 
     const metaFolder = this.getMetaFolder(folder);
     if (!metaFolder) return undefined;
@@ -70,10 +74,10 @@ export class TreeItemRange<TFolder extends WithId, TItem extends WithId> impleme
     return this._itemIds.addRange(allItemIds);
   }
 
-  private *getFolderItems(folder: TreeFolder<TFolder, TItem>): Generator<TreeItem<TFolder, TItem>, void, undefined> {
-    yield *folder.items;
+  private* getFolderItems(folder: TreeFolder<TFolder, TItem>): Generator<TreeItem<TFolder, TItem>, void, undefined> {
+    yield* folder.items;
     for (let subFolder of folder.folders) {
-      yield *this.getFolderItems(subFolder);
+      yield* this.getFolderItems(subFolder);
     }
   }
 
@@ -83,10 +87,13 @@ export class TreeItemRange<TFolder extends WithId, TItem extends WithId> impleme
    * @param state - A forced state (`true` = always add, `false` = always delete)
    * @returns The applied change (`true` = item added, `false` = item removed, `undefined` = nothing changed)
    */
-  toggleItem(item: string | WithId | BaseTreeItem<TItem> | TreeItem<TFolder, TItem>, state?: boolean): boolean|undefined {
+  toggleItem(
+    item: string | WithId | BaseTreeItem<TItem> | TreeItem<TFolder, TItem>,
+    state?: boolean
+  ): boolean | undefined {
     const itemId = isString(item) ? item :
-        'id' in item ? item.id :
-          item.model.id;
+      'id' in item ? item.id :
+        item.model.id;
 
     return this._itemIds.toggle(itemId, state);
   }
@@ -101,7 +108,18 @@ export class TreeItemRange<TFolder extends WithId, TItem extends WithId> impleme
 
   //<editor-fold desc="Folder Checkbox State">
   private folderStates = new Map<string, Signal<RangeSelectionState>>;
+
   getFolderState(folder: string | WithId | BaseTreeFolder<TFolder> | TreeFolder<TFolder, TItem>): Signal<RangeSelectionState> {
+
+    if (!isString(folder) && 'items' in folder) {
+
+      return computed(() => {
+        const selection = this.itemIds();
+        if (!selection.size) return 'none';
+        return this._getFolderState(undefined, folder, selection) ?? 'none';
+      });
+
+    }
 
     const folderId = isString(folder) ? folder :
       'id' in folder ? folder.id :
@@ -110,16 +128,7 @@ export class TreeItemRange<TFolder extends WithId, TItem extends WithId> impleme
     const existingState = this.folderStates.get(folderId);
     if (existingState) return existingState;
 
-    let folderSignal: Signal<TreeFolder<TFolder, TItem>|undefined>;
-    let saveSignal: boolean;
-
-    if (!isString(folder) && 'items' in folder) {
-      folderSignal = signal(folder);
-      saveSignal = false;
-    } else {
-      folderSignal = computed(() => this.dataSource.metaFolderLookup().get(folderId));
-      saveSignal = true;
-    }
+    const folderSignal = computed(() => this.dataSource.metaFolderLookup().get(folderId));
 
     const output = computed(() => {
       const selection = this.itemIds();
@@ -129,12 +138,12 @@ export class TreeItemRange<TFolder extends WithId, TItem extends WithId> impleme
       return this._getFolderState(undefined, folder, selection) ?? 'none';
     });
 
-    if (saveSignal) this.folderStates.set(folderId, output);
+    this.folderStates.set(folderId, output);
 
     return output;
   }
 
-  private getMetaFolder(folder: string | WithId | BaseTreeFolder<TFolder> | TreeFolder<TFolder, TItem>): TreeFolder<TFolder, TItem>|undefined {
+  private getMetaFolder(folder: string | WithId | BaseTreeFolder<TFolder> | TreeFolder<TFolder, TItem>): TreeFolder<TFolder, TItem> | undefined {
     if (!isString(folder) && 'items' in folder) return folder;
 
     const folderId = isString(folder) ? folder :
@@ -226,8 +235,8 @@ export class TreeItemRange<TFolder extends WithId, TItem extends WithId> impleme
    */
   folderIsActive(folder: string | WithId | BaseTreeFolder<TFolder> | TreeFolder<TFolder, TItem>): Signal<boolean> {
     const folderId = isString(folder) ? folder :
-        'id' in folder ? folder.id :
-          folder.model.id;
+      'id' in folder ? folder.id :
+        folder.model.id;
 
     return computed(() => this.metaItems().some(x => x.folderId == folderId));
   }
@@ -238,8 +247,8 @@ export class TreeItemRange<TFolder extends WithId, TItem extends WithId> impleme
    */
   itemIsActive(item: string | WithId | BaseTreeItem<TItem> | TreeItem<TFolder, TItem>): Signal<boolean> {
     const itemId = isString(item) ? item :
-        'id' in item ? item.id :
-          item.model.id;
+      'id' in item ? item.id :
+        item.model.id;
 
     return this._itemIds.has(itemId);
   }

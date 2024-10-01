@@ -5,7 +5,7 @@ import {DataFilter, IndividualDataFilter} from "./data-filter";
 import {
   assertInInjectionContext, computed, DestroyRef, effect, inject, Injector, signal, Signal, untracked, WritableSignal
 } from "@angular/core";
-import {debouncedSignal} from "../lib/signals";
+import {debouncedSignal} from "@juulsgaard/signal-tools";
 
 export interface IFilterServiceState<TModel> {
   filter<T extends TModel>(list: T[]): T[];

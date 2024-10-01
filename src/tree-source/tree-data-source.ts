@@ -18,7 +18,7 @@ import {
   assertInInjectionContext, computed, DestroyRef, effect, EffectRef, inject, Injector, isSignal, signal, Signal,
   untracked
 } from "@angular/core";
-import {ListDataSource} from "../list-source/list-data-source";
+import {ListDataSource} from "../list-source";
 import {takeUntilDestroyed} from "@angular/core/rxjs-interop";
 import {searchSignal} from "@juulsgaard/signal-tools";
 

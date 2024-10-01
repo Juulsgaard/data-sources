@@ -13,13 +13,15 @@ import {ISorted, sortByIndexAsc} from "../lib/index-sort";
 import {
   arrToObj, Conditional, getSelectorFn, KeysOfTypeOrNull, lowerFirst, Selection, WithId
 } from "@juulsgaard/ts-tools";
+import {Injector} from "@angular/core";
 
 //<editor-fold desc="Option Builder">
 export class TreeDataOptionConfig<TFolder extends WithId, TItem extends WithId> {
 
   private readonly options: TreeDataSourceOptions<TFolder, TItem>;
+  private readonly injector?: Injector;
 
-  constructor(itemParentId?: Selection<TItem, string>, folderChildren?: Selection<TFolder, TItem[]>) {
+  constructor(itemParentId?: Selection<TItem, string>, folderChildren?: Selection<TFolder, TItem[]>, options?: {injector?: Injector}) {
     this.options = {
       itemParentId,
       folderChildren,
@@ -216,7 +218,7 @@ export class TreeDataOptionConfig<TFolder extends WithId, TItem extends WithId> 
               itemIcon: getIcon ?? undefined,
               itemBonus: getBonus ?? undefined,
               itemTooltip: getTooltip ?? undefined,
-            })
+            }, this.injector)
         };
       }
     };
@@ -292,7 +294,8 @@ class TreeDataSourceConfig<TFolder extends WithId, TItem extends WithId> impleme
 
   constructor(
     public options: TreeDataSourceOptions<TFolder, TItem>,
-    public treeConfig?: TreeRowConfig<TFolder, TItem>
+    public treeConfig?: TreeRowConfig<TFolder, TItem>,
+    private readonly injector?: Injector
   ) {
 
     this.column = {
@@ -329,7 +332,7 @@ class TreeDataSourceConfig<TFolder extends WithId, TItem extends WithId> impleme
   }
 
   finish() {
-    return new TreeDataSource<TFolder, TItem>(this.options, this.searchColumns, this.hiddenSearchColumns, this.hiddenSortColumns, this.treeConfig);
+    return new TreeDataSource<TFolder, TItem>(this.options, this.searchColumns, this.hiddenSearchColumns, this.hiddenSortColumns, this.treeConfig, this.injector);
   }
 }
 
