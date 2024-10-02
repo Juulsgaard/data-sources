@@ -1,4 +1,4 @@
-import {isString, WithId} from "@juulsgaard/ts-tools";
+import {arrToLookup, isString, ReadonlyLookup, WithId} from "@juulsgaard/ts-tools";
 import {TreeDataSource} from "./tree-data-source";
 import {BaseTreeFolder, BaseTreeItem, TreeFolder, TreeItem} from "./tree-data";
 import {
@@ -65,7 +65,7 @@ export class TreeItemRange<TFolder extends WithId, TItem extends WithId> impleme
     if (state === false) return this._itemIds.deleteRange(allItemIds);
     if (state === true) return this._itemIds.addRange(allItemIds);
 
-    const selectionState = this._getFolderState(undefined, metaFolder, untracked(this.itemIds), shallow);
+    const selectionState = this.getMetaFolderState(undefined, metaFolder, untracked(this.itemIds), shallow);
 
     if (selectionState === 'all') {
       return this._itemIds.deleteRange(allItemIds);
@@ -107,16 +107,52 @@ export class TreeItemRange<TFolder extends WithId, TItem extends WithId> impleme
   }
 
   //<editor-fold desc="Folder Checkbox State">
-  private folderStates = new Map<string, Signal<RangeSelectionState>>;
 
-  getFolderState(folder: string | WithId | BaseTreeFolder<TFolder> | TreeFolder<TFolder, TItem>): Signal<RangeSelectionState> {
+  //<editor-fold desc="Bulk Folder State">
+  private readonly shallowFolderStates = computed(() => {
+    const selection = this.itemIds();
+    if (selection.size <= 0) return new Map<string, RangeSelectionState>();
+
+    const itemsPerFolder = arrToLookup(this.dataSource.baseItems(), x => x.folderId);
+
+    const map = new Map<string, RangeSelectionState>();
+    for (const [folderId, items] of itemsPerFolder) {
+        map.set(folderId, this.getFolderItemState(items, selection));
+    }
+
+    return map;
+  });
+
+  private readonly folderStates = computed(() => {
+    const itemStates = this.shallowFolderStates();
+    if (itemStates.size <= 0) return new Map<string, RangeSelectionState>();
+
+    const map = new Map<string, RangeSelectionState>();
+
+    const folders = this.dataSource.baseFolders();
+    const folderLookup = arrToLookup(this.dataSource.baseFolders(), x => x.parentId);
+
+    for (let folder of folders) {
+      this.storeLookupFolderState(folder, itemStates, folderLookup, map);
+    }
+
+    return map;
+  });
+  //</editor-fold>
+
+  /**
+   * Get a signal emitting the current selection state of a given folder
+   * @param folder
+   * @param shallow - Only look at direct descendants for selection state
+   */
+  getFolderState(folder: string | WithId | BaseTreeFolder<TFolder> | TreeFolder<TFolder, TItem>, shallow = false): Signal<RangeSelectionState> {
 
     if (!isString(folder) && 'items' in folder) {
 
       return computed(() => {
         const selection = this.itemIds();
         if (!selection.size) return 'none';
-        return this._getFolderState(undefined, folder, selection) ?? 'none';
+        return this.getMetaFolderState(undefined, folder, selection, shallow) ?? 'none';
       });
 
     }
@@ -125,22 +161,8 @@ export class TreeItemRange<TFolder extends WithId, TItem extends WithId> impleme
       'id' in folder ? folder.id :
         folder.model.id;
 
-    const existingState = this.folderStates.get(folderId);
-    if (existingState) return existingState;
-
-    const folderSignal = computed(() => this.dataSource.metaFolderLookup().get(folderId));
-
-    const output = computed(() => {
-      const selection = this.itemIds();
-      if (!selection.size) return 'none';
-      const folder = folderSignal();
-      if (!folder) return 'none';
-      return this._getFolderState(undefined, folder, selection) ?? 'none';
-    });
-
-    this.folderStates.set(folderId, output);
-
-    return output;
+    if (shallow) return computed(() => this.shallowFolderStates().get(folderId) ?? 'none');
+    else return computed(() => this.folderStates().get(folderId) ?? 'none');
   }
 
   private getMetaFolder(folder: string | WithId | BaseTreeFolder<TFolder> | TreeFolder<TFolder, TItem>): TreeFolder<TFolder, TItem> | undefined {
@@ -153,36 +175,19 @@ export class TreeItemRange<TFolder extends WithId, TItem extends WithId> impleme
     return untracked(this.dataSource.metaFolderLookup).get(folderId);
   }
 
-  private getCurrentFolderState(folder: string | WithId | BaseTreeFolder<TFolder> | TreeFolder<TFolder, TItem>) {
-
-    const selection = untracked(this.itemIds);
-    if (!selection.size) return 'none';
-
-    const folderId = isString(folder) ? folder :
-      'id' in folder ? folder.id :
-        folder.model.id;
-
-    const existingState = this.folderStates.get(folderId);
-    if (existingState) return untracked(existingState);
-
-    const metaFolder = this.getMetaFolder(folder);
-    if (!metaFolder) return 'none';
-
-    return this._getFolderState(undefined, metaFolder, selection) ?? 'none';
-  }
-
-  private _getFolderState(
+  //<editor-fold desc="Build Folder States">
+  private getMetaFolderState(
     parentState: RangeSelectionState | undefined,
     folder: TreeFolder<TFolder, TItem>,
     selection: ReadonlySet<string>,
     shallow = false
   ): RangeSelectionState | undefined {
 
-    if (shallow) return this.getFolderItemState(folder, selection);
+    if (shallow) return this.getFolderItemState(folder.items, selection);
 
     let state = parentState;
 
-    const itemState = this.getFolderItemState(folder, selection);
+    const itemState = this.getFolderItemState(folder.items, selection);
 
     if (itemState) {
       if (itemState === 'some') return 'some';
@@ -191,7 +196,7 @@ export class TreeItemRange<TFolder extends WithId, TItem extends WithId> impleme
     }
 
     for (let subFolder of folder.folders) {
-      const subState = this._getFolderState(parentState, subFolder, selection);
+      const subState = this.getMetaFolderState(parentState, subFolder, selection);
       if (subState === 'some') return 'some';
       state ??= subState;
       if (subState !== state) return 'some';
@@ -200,19 +205,62 @@ export class TreeItemRange<TFolder extends WithId, TItem extends WithId> impleme
     return state;
   }
 
+  private storeLookupFolderState(
+    folder: BaseTreeFolder<TFolder>,
+    itemStates: ReadonlyMap<string, RangeSelectionState>,
+    folderLookup: ReadonlyLookup<string|undefined, BaseTreeFolder<TFolder>>,
+    folderStates: Map<string, RangeSelectionState|undefined>
+  ): RangeSelectionState|undefined {
+
+    let state = folderStates.get(folder.model.id);
+    if (state) return state;
+
+    state = this.getLookupFolderState(folder, itemStates, folderLookup, folderStates);
+
+    folderStates.set(folder.model.id, state);
+    return state;
+  }
+
+  private getLookupFolderState(
+    folder: BaseTreeFolder<TFolder>,
+    itemStates: ReadonlyMap<string, RangeSelectionState>,
+    folderLookup: ReadonlyLookup<string|undefined, BaseTreeFolder<TFolder>>,
+    folderStates: Map<string, RangeSelectionState|undefined>
+  ): RangeSelectionState|undefined {
+
+    const itemState = itemStates.get(folder.model.id);
+    if (itemState === 'some') return 'some';
+
+    let state = itemState;
+
+    const subFolders = folderLookup.get(folder.model.id) ?? [];
+    for (let subFolder of subFolders) {
+      const subState = this.storeLookupFolderState(subFolder, itemStates, folderLookup, folderStates);
+
+      if (subState) {
+        if (subState === 'some') return 'some';
+
+        if (!state) state = subState;
+        else if (subState !== state) return 'some';
+      }
+    }
+
+    return state;
+  }
+
   private getFolderItemState(
-    folder: TreeFolder<TFolder, TItem>,
+    items: BaseTreeItem<TItem>[],
     selection: ReadonlySet<string>
-  ): RangeSelectionState | undefined {
+  ): RangeSelectionState {
 
-    if (!folder.items.length) return undefined;
+    if (!items.length) return 'none';
 
-    const state: RangeSelectionState = selection.has(folder.items[0]!.model.id) ? 'all' : 'none';
+    const state: RangeSelectionState = selection.has(items[0]!.model.id) ? 'all' : 'none';
 
-    if (folder.items.length === 1) return state;
+    if (items.length === 1) return state;
 
     let first = true;
-    for (let item of folder.items) {
+    for (let item of items) {
 
       if (first) {
         first = false;
@@ -226,6 +274,7 @@ export class TreeItemRange<TFolder extends WithId, TItem extends WithId> impleme
 
     return state;
   }
+  //</editor-fold>
 
   //</editor-fold>
 
