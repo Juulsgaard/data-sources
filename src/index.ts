@@ -8,3 +8,4 @@ export type {RangeSelectionState} from './lib/types';
 
 export * from './list-source';
 export * from './tree-source';
+export * from './searching';

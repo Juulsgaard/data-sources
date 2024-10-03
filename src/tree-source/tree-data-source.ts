@@ -1,6 +1,5 @@
 import {BehaviorSubject, EMPTY, isObservable, Observable, of} from "rxjs";
 import {catchError, switchMap} from "rxjs/operators";
-import Fuse from "fuse.js";
 import {
   BaseTreeFolder, BaseTreeItem, TreeAsideData, TreeAsideFolderData, TreeAsideItemData, TreeDataSourceOptions, TreeFlag,
   TreeFolder, TreeFolderAction, TreeFolderData, TreeFolderSearchData, TreeFolderSearchRowData,
@@ -21,6 +20,8 @@ import {
 import {ListDataSource} from "../list-source";
 import {takeUntilDestroyed} from "@angular/core/rxjs-interop";
 import {searchSignal} from "@juulsgaard/signal-tools";
+import {DataSearcher, DataSearchService} from "../searching/data-search.service";
+import {PathSearchKey} from "../searching/data-search.models";
 
 export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
 
@@ -69,6 +70,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
   readonly hasActions: boolean;
 
   private readonly onDestroy: DestroyRef;
+  private readonly searchService: DataSearchService;
 
   constructor(
     private readonly options: TreeDataSourceOptions<TFolder, TItem>,
@@ -86,6 +88,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
     if (!this.injector) assertInInjectionContext(ListDataSource);
 
     this.onDestroy = this.injector?.get(DestroyRef) ?? inject(DestroyRef);
+    this.searchService = this.injector?.get(DataSearchService) ?? inject(DataSearchService);
 
     //<editor-fold desc="Initialise">
 
@@ -238,7 +241,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
     const mergedSearchData = computed(
       () => [...folderSearchData(), ...itemSearchData()]
         .sort((a, b) => (a?.score ?? 0) - (b?.score ?? 0))
-        .map(x => x.item)
+        .map(x => x.value)
     );
 
     // Sorting
@@ -250,13 +253,13 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
 
     this.folderSearchResult = computed(
       () => this.mapSearchRows(
-        this.sortRows(folderSearchData().map(x => x.item))
+        this.sortRows(folderSearchData().map(x => x.value))
       ) as TreeFolderSearchRowData<TFolder, TItem>[]
     );
 
     this.itemSearchResult = computed(
       () => this.mapSearchRows(
-        this.sortRows(itemSearchData().map(x => x.item))
+        this.sortRows(itemSearchData().map(x => x.value))
       ) as TreeItemSearchRowData<TFolder, TItem>[]
     );
 
@@ -849,12 +852,12 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
   readonly searchQuery = signal<string | undefined>(undefined);
 
   private readonly preSearchFolders: Signal<TreeFolderSearchData<TFolder, TItem>[]>;
-  private _folderSearcher?: Fuse<TreeFolderSearchData<TFolder, TItem>>;
-  private readonly folderSearcher: Signal<Fuse<TreeFolderSearchData<TFolder, TItem>>>;
+  private _folderSearcher?: DataSearcher<TreeFolderSearchData<TFolder, TItem>>;
+  private readonly folderSearcher: Signal<DataSearcher<TreeFolderSearchData<TFolder, TItem>>>;
 
   private readonly preSearchItems: Signal<TreeItemSearchData<TFolder, TItem>[]>;
-  private _itemSearcher?: Fuse<TreeItemSearchData<TFolder, TItem>>;
-  private readonly itemSearcher: Signal<Fuse<TreeItemSearchData<TFolder, TItem>>>;
+  private _itemSearcher?: DataSearcher<TreeItemSearchData<TFolder, TItem>>;
+  private readonly itemSearcher: Signal<DataSearcher<TreeItemSearchData<TFolder, TItem>>>;
 
   private searchResultLimit = 100;
 
@@ -872,20 +875,18 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
   private getFolderSearcher(folders: TreeFolderSearchData<TFolder, TItem>[]) {
 
     if (this._folderSearcher) {
-      this._folderSearcher.setCollection(folders);
+      this._folderSearcher.populate(folders);
       return this._folderSearcher;
     }
 
-    this._folderSearcher = new Fuse<TreeFolderSearchData<TFolder, TItem>>(folders, {
-      includeScore: true,
-      shouldSort: true,
-      keys: mapToArr(this.searchConfigs, (col, key) => ({key, col}))
-        .filter(({col}) => !!col.mapFolder)
-        .map(({key, col}) => ({
-          name: ['search', key],
-          weight: col.weight ?? 1
-        }))
-    });
+    const keys: PathSearchKey[] = mapToArr(this.searchConfigs, (col, key) => ({key, col}))
+      .filter(({col}) => !!col.mapFolder)
+      .map(({key, col}) => ({
+        path: ['search', key],
+        weight: col.weight ?? 1
+      }));
+
+    this._folderSearcher = this.searchService.createSearcher(folders, keys);
 
     return this._folderSearcher;
   }
@@ -898,17 +899,15 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
   private getItemSearcher(items: TreeItemSearchData<TFolder, TItem>[]) {
 
     if (this._itemSearcher) {
-      this._itemSearcher.setCollection(items);
+      this._itemSearcher.populate(items);
       return this._itemSearcher;
     }
 
-    this._itemSearcher = new Fuse<TreeItemSearchData<TFolder, TItem>>(items, {
-      includeScore: true,
-      shouldSort: true,
-      keys: mapToArr(this.searchConfigs, (val, key) => ({key, val}))
-        .filter(({val}) => !!val.mapItem)
-        .map(({key}) => ['search', key])
-    });
+    const keys: PathSearchKey[] = mapToArr(this.searchConfigs, (val, key) => ({key, val}))
+      .filter(({val}) => !!val.mapItem)
+      .map(({key, val}) => ({path: ['search', key], weight: val.weight}));
+
+    this._itemSearcher = this.searchService.createSearcher(items, keys);
 
     return this._itemSearcher;
   }
@@ -922,7 +921,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
    */
   private searchFolders(query: string|undefined, limit?: number) {
     if (!query) return [];
-    return this.folderSearcher()!.search(query, {limit: limit ?? this.searchResultLimit});
+    return this.folderSearcher().search(query, limit ?? this.searchResultLimit);
   }
 
   /**
@@ -934,7 +933,7 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
    */
   private searchItems(query: string|undefined, limit?: number) {
     if (!query) return [];
-    return this.itemSearcher().search(query, {limit: limit ?? this.searchResultLimit});
+    return this.itemSearcher().search(query, limit ?? this.searchResultLimit);
   }
 
   //</editor-fold>
@@ -952,14 +951,14 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
       const query = searchQuery();
       if (!query) return [];
 
-      const result = this.folderSearcher().search(query ?? '', {limit});
-      return result.map(({item, score}) => (
+      const result = this.folderSearcher().search(query, limit);
+      return result.map(({value, score}) => (
         {
-          id: item.model.model.id,
-          model: item.model,
-          name: this.treeConfig?.folderName(item.model.model, item.model) ?? 'N/A',
-          icon: this.getFolderIcon(item.model),
-          extra: this.treeConfig?.folderBonus?.(item.model.model, item.model),
+          id: value.model.model.id,
+          model: value.model,
+          name: this.treeConfig?.folderName(value.model.model, value.model) ?? 'N/A',
+          icon: this.getFolderIcon(value.model),
+          extra: this.treeConfig?.folderBonus?.(value.model.model, value.model),
           score: score ?? 0
         } satisfies DetachedSearchData<TreeFolder<TFolder, TItem>>
       ));
@@ -977,14 +976,14 @@ export class TreeDataSource<TFolder extends WithId, TItem extends WithId> {
       const query = searchQuery();
       if (!query) return [];
 
-      const result = this.itemSearcher().search(query ?? '', {limit});
-      return result.map(({item, score}) => (
+      const result = this.itemSearcher().search(query, limit);
+      return result.map(({value, score}) => (
         {
-          id: item.model.model.id,
-          model: item.model,
-          name: this.treeConfig?.itemName(item.model.model, item.model) ?? 'N/A',
-          icon: this.getItemIcon(item.model),
-          extra: this.treeConfig?.itemBonus?.(item.model.model, item.model),
+          id: value.model.model.id,
+          model: value.model,
+          name: this.treeConfig?.itemName(value.model.model, value.model) ?? 'N/A',
+          icon: this.getItemIcon(value.model),
+          extra: this.treeConfig?.itemBonus?.(value.model.model, value.model),
           score: score ?? 0
         } satisfies DetachedSearchData<TreeItem<TFolder, TItem>>
       ));

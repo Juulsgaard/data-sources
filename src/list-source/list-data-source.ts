@@ -1,6 +1,5 @@
 import {BehaviorSubject, EMPTY, isObservable, Observable, of} from "rxjs";
 import {catchError, switchMap} from "rxjs/operators";
-import Fuse from "fuse.js";
 import {IFilterServiceState} from "../filtering/filter-service";
 import {
   GridData, GridDataConfig, HiddenSearchColumn, HiddenSortColumn, ListAction, ListActionConfig, ListData,
@@ -17,6 +16,8 @@ import {
 } from "@angular/core";
 import {takeUntilDestroyed} from "@angular/core/rxjs-interop";
 import {searchSignal} from "@juulsgaard/signal-tools";
+import {DataSearcher, DataSearchService} from "../searching/data-search.service";
+import {PathSearchKey} from "../searching/data-search.models";
 
 interface Outputs<T> {
   simple: Signal<ListUniversalData<T>[]>;
@@ -32,7 +33,7 @@ export class ListDataSource<TModel extends WithId> {
 
   public readonly sortOptions: SortOption[];
   private readonly sortLookup: Map<string, SortFn<TModel>>;
-  private readonly searchKeys: { weight?: number, key: string }[] = [];
+  private readonly searchKeys: PathSearchKey[] = [];
 
   public readonly paginated: boolean;
   public readonly indexSorted: boolean;
@@ -47,6 +48,7 @@ export class ListDataSource<TModel extends WithId> {
   //</editor-fold>
 
   private readonly onDestroy: DestroyRef;
+  private readonly searchService: DataSearchService;
 
   constructor(
     private readonly options: ListDataSourceOptions<TModel>,
@@ -61,6 +63,7 @@ export class ListDataSource<TModel extends WithId> {
     if (!this.injector) assertInInjectionContext(ListDataSource);
 
     this.onDestroy = this.injector?.get(DestroyRef) ?? inject(DestroyRef);
+    this.searchService = this.injector?.get(DataSearchService) ?? inject(DataSearchService);
 
     this.columns = mapToArr(tableColumns);
 
@@ -85,7 +88,7 @@ export class ListDataSource<TModel extends WithId> {
     }
 
     for (let [id, col] of searchColumns) {
-      this.searchKeys.push({key: id, weight: col.weight});
+      this.searchKeys.push({path: [id], weight: col.weight});
     }
 
     for (let [id, col] of tableColumns) {
@@ -101,7 +104,7 @@ export class ListDataSource<TModel extends WithId> {
       }
 
       if (col.searchable) {
-        this.searchKeys.push({key: id, weight: col.searchWeight});
+        this.searchKeys.push({path: [id], weight: col.searchWeight});
       }
     }
 
@@ -337,8 +340,8 @@ export class ListDataSource<TModel extends WithId> {
   //<editor-fold desc="Search">
   readonly searchQuery = signal<string | undefined>(undefined);
   private readonly preSearchData: Signal<ListSearchData<TModel>[]>;
-  private _searcher?: Fuse<ListSearchData<TModel>>;
-  private readonly searcher: Signal<Fuse<ListSearchData<TModel>>>;
+  private _searcher?: DataSearcher<ListSearchData<TModel>>;
+  private readonly searcher: Signal<DataSearcher<ListSearchData<TModel>>>;
   private searchResultLimit = 100;
 
   readonly searching: Signal<boolean>;
@@ -375,23 +378,15 @@ export class ListDataSource<TModel extends WithId> {
    * @param list
    * @private
    */
-  private getSearcher(list: ListSearchData<TModel>[]): Fuse<ListSearchData<TModel>> {
+  private getSearcher(list: ListSearchData<TModel>[]): DataSearcher<ListSearchData<TModel>> {
 
     if (this._searcher) {
-      this._searcher.setCollection(list);
+      this._searcher.populate(list);
       return this._searcher;
     }
 
-    this._searcher = new Fuse<ListSearchData<TModel>>(list, {
-      includeScore: true,
-      shouldSort: true,
-      keys: this.searchKeys.map(({key, weight}) => (
-        {
-          name: ['search', key],
-          weight: weight ?? 1
-        }
-      ))
-    });
+    const keys = this.searchKeys.map(({path, ...key}) => ({...key, path: ['search', ...path]}));
+    this._searcher = this.searchService.createSearcher(list, keys);
 
     return this._searcher;
   }
@@ -404,8 +399,8 @@ export class ListDataSource<TModel extends WithId> {
    */
   private search(query: string | undefined, limit?: number): TModel[] {
     if (!query) return [];
-    const result = this.searcher().search(query ?? '', {limit: limit ?? this.searchResultLimit});
-    return result.map(x => x.item.model);
+    const result = this.searcher().search(query, limit ?? this.searchResultLimit);
+    return result.map(x => x.value.model);
   }
 
   //</editor-fold>
@@ -442,15 +437,15 @@ export class ListDataSource<TModel extends WithId> {
       const query = searchQuery();
       if (!query) return [];
 
-      const result = this.searcher().search(query ?? '', {limit});
+      const result = this.searcher().search(query, limit);
       return result.map(x => (
         {
-          id: x.item.model.id,
-          model: x.item.model,
-          name: getName(x.item.model),
-          icon: getIcon(x.item.model),
-          extra: getExtra(x.item.model),
-          score: x.score ?? 0,
+          id: x.value.model.id,
+          model: x.value.model,
+          name: getName(x.value.model),
+          icon: getIcon(x.value.model),
+          extra: getExtra(x.value.model),
+          score: x.score,
         } satisfies DetachedSearchData<TModel>
       ));
     });
